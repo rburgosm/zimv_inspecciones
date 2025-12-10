@@ -22,41 +22,64 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--limpiar',
+            '--no-limpiar',
             action='store_true',
-            help='Elimina todos los datos existentes antes de crear los de demostración',
+            help='NO elimina los datos existentes antes de crear los de demostración (por defecto se limpian)',
         )
 
-    def handle(self, *args, **options):
-        if options['limpiar']:
-            self.stdout.write(self.style.WARNING('Eliminando datos existentes...'))
-            InspeccionProducto.objects.all().delete()
-            PeriodoValidacionCertificacion.objects.all().delete()
-            OperarioCertificacion.objects.all().delete()
-            AuditoriaProducto.objects.all().delete()
-            Auditor.objects.all().delete()
-            Operario.objects.all().delete()
-            Certificacion.objects.all().delete()
-            self.stdout.write(self.style.SUCCESS('Datos eliminados.'))
+    def limpiar_datos(self):
+        """Elimina todos los datos de demostración existentes"""
+        self.stdout.write(self.style.WARNING('Eliminando datos existentes...'))
+        
+        # Eliminar en orden para respetar foreign keys
+        InspeccionProducto.objects.all().delete()
+        PeriodoValidacionCertificacion.objects.all().delete()
+        OperarioCertificacion.objects.all().delete()
+        AuditoriaProducto.objects.all().delete()
+        Auditor.objects.all().delete()
+        Operario.objects.all().delete()
+        Certificacion.objects.all().delete()
+        
+        self.stdout.write(self.style.SUCCESS('Datos eliminados.'))
 
-        # Obtener o crear usuario admin
-        admin_user, _ = User.objects.get_or_create(
+    def handle(self, *args, **options):
+        # Por defecto, limpiar datos antes de crear nuevos
+        if not options['no_limpiar']:
+            self.limpiar_datos()
+        else:
+            self.stdout.write(self.style.WARNING('Manteniendo datos existentes (--no-limpiar activado)'))
+
+        # Obtener o crear usuario admin (no se elimina al limpiar)
+        admin_user, created = User.objects.get_or_create(
             username='admin',
             defaults={'email': 'admin@example.com', 'is_superuser': True, 'is_staff': True}
         )
-        if not admin_user.check_password('admin123'):
+        if created:
             admin_user.set_password('admin123')
             admin_user.save()
+            self.stdout.write('  ✓ Usuario admin creado')
+        elif not admin_user.check_password('admin123'):
+            admin_user.set_password('admin123')
+            admin_user.save()
+            self.stdout.write('  ✓ Contraseña de admin actualizada')
 
-        # Crear configuración si no existe
-        if not ConfiguracionInspecciones.objects.filter(esta_activo=True).exists():
-            ConfiguracionInspecciones.objects.create(
-                numero_dias_laborales_req=180,
-                inspecciones_minimas=29,
-                esta_activo=True,
-                usuario_creacion=admin_user
-            )
-            self.stdout.write(self.style.SUCCESS('Configuración creada.'))
+        # Crear configuración si no existe (se recrea si se limpió)
+        config, created = ConfiguracionInspecciones.objects.get_or_create(
+            esta_activo=True,
+            defaults={
+                'numero_dias_laborales_req': 180,
+                'inspecciones_minimas': 29,
+                'usuario_creacion': admin_user
+            }
+        )
+        if created:
+            self.stdout.write(self.style.SUCCESS('  ✓ Configuración creada.'))
+        else:
+            # Asegurar valores correctos
+            config.numero_dias_laborales_req = 180
+            config.inspecciones_minimas = 29
+            config.save()
+            self.stdout.write(self.style.SUCCESS('  ✓ Configuración verificada.'))
 
         # Crear certificaciones
         self.stdout.write('Creando certificaciones...')

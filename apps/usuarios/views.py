@@ -94,6 +94,26 @@ def home_view(request):
             es_critico = True
             nivel_criticidad = 'alto'
         
+        # Criterio 4: Menos del 40% de piezas y más del 40% del tiempo (más flexible)
+        if porcentaje_piezas < 40 and porcentaje_tiempo > 40:
+            es_critico = True
+            if porcentaje_piezas < 20:
+                nivel_criticidad = 'critico'
+            elif porcentaje_piezas < 30:
+                nivel_criticidad = 'alto'
+            else:
+                nivel_criticidad = 'medio'
+        
+        # Criterio 5: Vence en menos de 90 días y tiene menos del 60% de piezas
+        if dias_restantes <= 90 and dias_restantes > 0 and porcentaje_piezas < 60:
+            es_critico = True
+            if dias_restantes <= 30:
+                nivel_criticidad = 'critico' if nivel_criticidad == 'normal' else nivel_criticidad
+            elif dias_restantes <= 60:
+                nivel_criticidad = 'alto' if nivel_criticidad == 'normal' else nivel_criticidad
+            else:
+                nivel_criticidad = 'medio' if nivel_criticidad == 'normal' else nivel_criticidad
+        
         if es_critico:
             periodos_criticos_lista.append({
                 'periodo': periodo,

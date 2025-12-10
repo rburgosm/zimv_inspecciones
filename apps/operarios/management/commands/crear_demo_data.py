@@ -242,8 +242,9 @@ class Command(BaseCommand):
             periodo3b.save()
         self.stdout.write(f'  ✓ Asignaciones creadas para {operarios[2].nombre_completo} (2 certificaciones, se crearán 15 y 10 piezas)')
 
-        # Asignación 4: Operario con periodo CRÍTICO - próximo a vencer (solo 5 días restantes)
-        fecha_asignacion4 = hoy - timedelta(days=175)  # Cerca del límite de 180 días (quedan ~5 días)
+        # Asignación 4: Operario con periodo CRÍTICO - próximo a vencer
+        # Crear asignación hace 175 días, pero ajustar manualmente la fecha fin para que queden solo 5 días
+        fecha_asignacion4 = hoy - timedelta(days=175)
         asignacion4, _ = OperarioCertificacion.objects.get_or_create(
             operario=operarios[3],
             certificacion=certificaciones[1],
@@ -255,9 +256,11 @@ class Command(BaseCommand):
         )
         periodo4 = asignacion4.periodos.filter(esta_vigente=True).first()
         if periodo4:
+            # Ajustar fecha fin para que queden solo 5 días
+            periodo4.fecha_fin_periodo = hoy + timedelta(days=5)
             periodo4.inspecciones_realizadas = 0
             periodo4.save()
-            self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion4.operario.nombre_completo} - {asignacion4.certificacion.nombre} (se crearán 15 piezas, CRÍTICO - vence en ~5 días)')
+            self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion4.operario.nombre_completo} - {asignacion4.certificacion.nombre} (se crearán 15 piezas, CRÍTICO - vence en 5 días)')
 
         # Asignación 5: Operario nuevo sin inspecciones
         asignacion5, _ = OperarioCertificacion.objects.get_or_create(
@@ -272,8 +275,8 @@ class Command(BaseCommand):
         self.stdout.write(f'  ✓ Asignación creada: {asignacion5.operario.nombre_completo} - {asignacion5.certificacion.nombre} (0 inspecciones)')
         
         # Asignación 6: Operario con periodo CRÍTICO - bajo progreso (mucho tiempo transcurrido, pocas piezas)
-        # Periodo iniciado hace 100 días, solo tiene 8 piezas de 29 requeridas
-        fecha_asignacion6 = hoy - timedelta(days=100)
+        # Periodo iniciado hace 120 días (más del 60% del tiempo), solo tiene 8 piezas de 29 requeridas
+        fecha_asignacion6 = hoy - timedelta(days=120)
         asignacion6, _ = OperarioCertificacion.objects.get_or_create(
             operario=operarios[0],  # Reutilizar operario 1 pero con otra certificación
             certificacion=certificaciones[1],
@@ -285,9 +288,11 @@ class Command(BaseCommand):
         )
         periodo6 = asignacion6.periodos.filter(esta_vigente=True).first()
         if periodo6:
+            # Ajustar fecha fin para que queden 60 días (total ~180 días)
+            periodo6.fecha_fin_periodo = hoy + timedelta(days=60)
             periodo6.inspecciones_realizadas = 0
             periodo6.save()
-            self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion6.operario.nombre_completo} - {asignacion6.certificacion.nombre} (se crearán 8 piezas, CRÍTICO - bajo progreso)')
+            self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion6.operario.nombre_completo} - {asignacion6.certificacion.nombre} (se crearán 8 piezas, CRÍTICO - bajo progreso: 66% tiempo, solo 27% piezas)')
 
         # Crear inspecciones de ejemplo
         # IMPORTANTE: Se cuentan PIEZAS auditadas, no número de inspecciones

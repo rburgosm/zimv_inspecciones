@@ -242,8 +242,8 @@ class Command(BaseCommand):
             periodo3b.save()
         self.stdout.write(f'  ✓ Asignaciones creadas para {operarios[2].nombre_completo} (2 certificaciones, se crearán 15 y 10 piezas)')
 
-        # Asignación 4: Operario con periodo próximo a vencer
-        fecha_asignacion4 = hoy - timedelta(days=170)  # Cerca del límite de 180 días
+        # Asignación 4: Operario con periodo CRÍTICO - próximo a vencer (solo 5 días restantes)
+        fecha_asignacion4 = hoy - timedelta(days=175)  # Cerca del límite de 180 días (quedan ~5 días)
         asignacion4, _ = OperarioCertificacion.objects.get_or_create(
             operario=operarios[3],
             certificacion=certificaciones[1],
@@ -257,7 +257,7 @@ class Command(BaseCommand):
         if periodo4:
             periodo4.inspecciones_realizadas = 0
             periodo4.save()
-            self.stdout.write(f'  ✓ Asignación creada: {asignacion4.operario.nombre_completo} - {asignacion4.certificacion.nombre} (se crearán 20 piezas, próximo a vencer)')
+            self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion4.operario.nombre_completo} - {asignacion4.certificacion.nombre} (se crearán 15 piezas, CRÍTICO - vence en ~5 días)')
 
         # Asignación 5: Operario nuevo sin inspecciones
         asignacion5, _ = OperarioCertificacion.objects.get_or_create(
@@ -270,22 +270,44 @@ class Command(BaseCommand):
             }
         )
         self.stdout.write(f'  ✓ Asignación creada: {asignacion5.operario.nombre_completo} - {asignacion5.certificacion.nombre} (0 inspecciones)')
+        
+        # Asignación 6: Operario con periodo CRÍTICO - bajo progreso (mucho tiempo transcurrido, pocas piezas)
+        # Periodo iniciado hace 100 días, solo tiene 8 piezas de 29 requeridas
+        fecha_asignacion6 = hoy - timedelta(days=100)
+        asignacion6, _ = OperarioCertificacion.objects.get_or_create(
+            operario=operarios[0],  # Reutilizar operario 1 pero con otra certificación
+            certificacion=certificaciones[1],
+            fecha_asignacion=fecha_asignacion6,
+            defaults={
+                'esta_activa': True,
+                'usuario_creacion': admin_user
+            }
+        )
+        periodo6 = asignacion6.periodos.filter(esta_vigente=True).first()
+        if periodo6:
+            periodo6.inspecciones_realizadas = 0
+            periodo6.save()
+            self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion6.operario.nombre_completo} - {asignacion6.certificacion.nombre} (se crearán 8 piezas, CRÍTICO - bajo progreso)')
 
         # Crear inspecciones de ejemplo
         # IMPORTANTE: Se cuentan PIEZAS auditadas, no número de inspecciones
         # El objetivo es alcanzar 29 PIEZAS por periodo, no 29 inspecciones
         self.stdout.write('Creando inspecciones de ejemplo...')
         asignaciones_con_periodos = [
-            (asignacion1, periodo1, 25),  # 25 piezas (pueden ser de varias inspecciones)
-            (asignacion2, periodo2, 5),   # 5 piezas
-            (asignacion3a, periodo3a, 15), # 15 piezas
-            (asignacion3b, periodo3b, 10), # 10 piezas
-            (asignacion4, periodo4, 20),  # 20 piezas
+            (asignacion1, periodo1, 25, 'OP-001'),  # 25 piezas
+            (asignacion2, periodo2, 5, 'OP-002'),   # 5 piezas
+            (asignacion3a, periodo3a, 15, 'OP-003'), # 15 piezas
+            (asignacion3b, periodo3b, 10, 'OP-004'), # 10 piezas
+            (asignacion4, periodo4, 15, 'OP-005'),  # 15 piezas (CRÍTICO - poco tiempo)
         ]
+        
+        # Agregar asignación 6 si existe
+        if 'asignacion6' in locals() and periodo6:
+            asignaciones_con_periodos.append((asignacion6, periodo6, 8, 'OP-006'))  # 8 piezas (CRÍTICO - bajo progreso)
 
         total_inspecciones = 0
         total_piezas = 0
-        for asignacion, periodo, piezas_objetivo in asignaciones_con_periodos:
+        for asignacion, periodo, piezas_objetivo, prefijo_orden in asignaciones_con_periodos:
             if not periodo:
                 continue
             
@@ -337,6 +359,9 @@ class Command(BaseCommand):
                 piezas_restantes = piezas_objetivo - piezas_creadas
                 piezas_en_inspeccion = min(random.randint(1, 10), piezas_restantes)  # Entre 1 y 10 piezas por inspección
                 
+                # Generar número de orden único
+                numero_orden = f"{prefijo_orden}-{num_inspeccion+1:03d}-{fecha_inspeccion.strftime('%Y%m%d')}"
+                
                 # Crear inspección (el signal sumará las piezas al contador automáticamente)
                 inspeccion = InspeccionProducto.objects.create(
                     operario_certificacion=asignacion,
@@ -346,6 +371,7 @@ class Command(BaseCommand):
                     fecha_inspeccion=fecha_inspeccion,
                     piezas_auditadas=piezas_en_inspeccion,
                     resultado_inspeccion=random.choice(['OK', 'NO OK', None]),
+                    numero_orden=numero_orden,
                     observaciones=f'Inspección de ejemplo {num_inspeccion+1} ({piezas_en_inspeccion} piezas)',
                     usuario_creacion=admin_user
                 )

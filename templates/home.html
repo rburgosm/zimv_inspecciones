@@ -5,9 +5,11 @@
 {% block content %}
 <div class="py-6">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 class="text-3xl font-bold text-gray-900 mb-6">Bienvenido al Sistema de Inspecciones Zimvie</h1>
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Dashboard - Sistema de Inspecciones Zimvie</h1>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Estadísticas principales -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Operarios Activos -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="p-5">
                     <div class="flex items-center">
@@ -18,9 +20,10 @@
                         </div>
                         <div class="ml-5 w-0 flex-1">
                             <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Operarios</dt>
-                                <dd class="text-lg font-medium text-gray-900">
-                                    <a href="{% url 'operarios:lista' %}" class="text-blue-600 hover:text-blue-800">Gestionar</a>
+                                <dt class="text-sm font-medium text-gray-500 truncate">Operarios Activos</dt>
+                                <dd class="text-2xl font-semibold text-gray-900">{{ stats.operarios_activos }}</dd>
+                                <dd class="text-sm text-gray-500">
+                                    <a href="{% url 'operarios:lista' %}" class="text-blue-600 hover:text-blue-800">Ver todos →</a>
                                 </dd>
                             </dl>
                         </div>
@@ -28,6 +31,7 @@
                 </div>
             </div>
 
+            <!-- Certificaciones Activas -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="p-5">
                     <div class="flex items-center">
@@ -38,9 +42,10 @@
                         </div>
                         <div class="ml-5 w-0 flex-1">
                             <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Certificaciones</dt>
-                                <dd class="text-lg font-medium text-gray-900">
-                                    <a href="{% url 'certificaciones:lista' %}" class="text-blue-600 hover:text-blue-800">Gestionar</a>
+                                <dt class="text-sm font-medium text-gray-500 truncate">Certificaciones Activas</dt>
+                                <dd class="text-2xl font-semibold text-gray-900">{{ stats.certificaciones_activas }}</dd>
+                                <dd class="text-sm text-gray-500">
+                                    <a href="{% url 'certificaciones:lista' %}" class="text-blue-600 hover:text-blue-800">Ver todas →</a>
                                 </dd>
                             </dl>
                         </div>
@@ -48,25 +53,165 @@
                 </div>
             </div>
 
+            <!-- Periodos Vigentes -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="p-5">
                     <div class="flex items-center">
                         <div class="flex-shrink-0">
                             <svg class="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                         <div class="ml-5 w-0 flex-1">
                             <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Inspecciones</dt>
-                                <dd class="text-lg font-medium text-gray-900">
-                                    <a href="{% url 'inspecciones:lista' %}" class="text-blue-600 hover:text-blue-800">Registrar</a>
+                                <dt class="text-sm font-medium text-gray-500 truncate">Periodos Vigentes</dt>
+                                <dd class="text-2xl font-semibold text-gray-900">{{ stats.periodos_vigentes }}</dd>
+                                <dd class="text-sm text-gray-500">
+                                    <span class="{% if stats.periodos_criticos_count > 0 %}text-red-600 font-semibold{% else %}text-gray-500{% endif %}">
+                                        {{ stats.periodos_criticos_count }} críticos
+                                    </span>
                                 </dd>
                             </dl>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Inspecciones Este Mes -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">Inspecciones Este Mes</dt>
+                                <dd class="text-2xl font-semibold text-gray-900">{{ stats.inspecciones_mes }}</dd>
+                                <dd class="text-sm text-gray-500">
+                                    <a href="{% url 'inspecciones:lista' %}" class="text-blue-600 hover:text-blue-800">Ver todas →</a>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de Periodos Críticos -->
+        <div class="bg-white shadow rounded-lg mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-bold text-gray-900">Periodos Críticos</h2>
+                <p class="text-sm text-gray-500 mt-1">Periodos que requieren atención inmediata</p>
+            </div>
+            
+            {% if periodos_criticos %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Operario</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Certificación</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Periodo</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Piezas</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Días Restantes</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for item in periodos_criticos %}
+                        <tr class="{% if item.nivel_criticidad == 'critico' %}bg-red-50{% elif item.nivel_criticidad == 'alto' %}bg-orange-50{% else %}bg-yellow-50{% endif %}">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ item.periodo.operario_certificacion.operario.nombre_completo }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ item.periodo.operario_certificacion.certificacion.nombre }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                Periodo {{ item.periodo.numero_periodo }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <div class="flex items-center">
+                                    <span class="font-semibold">{{ item.periodo.inspecciones_realizadas }} / {{ item.periodo.inspecciones_requeridas }}</span>
+                                    <span class="ml-2 text-xs text-gray-500">({{ item.porcentaje_piezas }}%)</span>
+                                </div>
+                                {% if item.piezas_faltantes > 0 %}
+                                <div class="text-xs text-red-600 mt-1">
+                                    Faltan {{ item.piezas_faltantes }} piezas
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                {% if item.dias_restantes < 0 %}
+                                <span class="text-red-600 font-semibold">Vencido</span>
+                                {% elif item.dias_restantes <= 7 %}
+                                <span class="text-red-600 font-semibold">{{ item.dias_restantes }} días</span>
+                                {% elif item.dias_restantes <= 15 %}
+                                <span class="text-orange-600 font-semibold">{{ item.dias_restantes }} días</span>
+                                {% else %}
+                                <span class="text-gray-900">{{ item.dias_restantes }} días</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if item.nivel_criticidad == 'critico' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Crítico
+                                </span>
+                                {% elif item.nivel_criticidad == 'alto' %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                    Alto
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    Medio
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <a href="{% url 'asignaciones:detalle' item.periodo.operario_certificacion.pk %}" 
+                                   class="text-blue-600 hover:text-blue-800">
+                                    Ver detalle
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="px-6 py-8 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No hay periodos críticos</h3>
+                <p class="mt-1 text-sm text-gray-500">Todos los periodos están en buen estado.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Accesos rápidos -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <a href="{% url 'inspecciones:crear' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg text-center transition">
+                <svg class="mx-auto h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Registrar Inspección
+            </a>
+            <a href="{% url 'asignaciones:crear' %}" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg text-center transition">
+                <svg class="mx-auto h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+                Asignar Certificación
+            </a>
+            <a href="{% url 'inspecciones:lista' %}" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg text-center transition">
+                <svg class="mx-auto h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                Ver Inspecciones
+            </a>
         </div>
     </div>
 </div>

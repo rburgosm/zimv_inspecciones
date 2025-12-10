@@ -17,10 +17,10 @@ def crear_periodo_inicial(sender, instance, created, **kwargs):
         if not config:
             # Valores por defecto si no hay configuración
             dias_laborables = 180
-            inspecciones_requeridas = 29
+            piezas_requeridas = 29  # 29 piezas, no 29 inspecciones
         else:
             dias_laborables = config.numero_dias_laborales_req
-            inspecciones_requeridas = config.inspecciones_minimas
+            piezas_requeridas = config.inspecciones_minimas  # Este campo realmente representa piezas, no inspecciones
 
         fecha_fin = calcular_fecha_fin_periodo(instance.fecha_asignacion, dias_laborables)
         
@@ -30,8 +30,8 @@ def crear_periodo_inicial(sender, instance, created, **kwargs):
             fecha_inicio_periodo=instance.fecha_asignacion,
             fecha_fin_periodo=fecha_fin,
             numero_dias_laborales_req=dias_laborables,
-            inspecciones_requeridas=inspecciones_requeridas,
-            inspecciones_realizadas=0,
+            inspecciones_requeridas=piezas_requeridas,  # Piezas requeridas (29)
+            inspecciones_realizadas=0,  # Contador de piezas auditadas (suma de piezas_auditadas)
             esta_completado=False,
             esta_vigente=True,
             usuario_creacion=instance.usuario_creacion

@@ -156,7 +156,7 @@ class Command(BaseCommand):
         self.stdout.write('Creando asignaciones y periodos...')
         hoy = timezone.now().date()
         
-        # Asignación 1: Operario con periodo casi completado (25/29 inspecciones)
+        # Asignación 1: Operario con periodo casi completado (25/29 piezas)
         asignacion1, _ = OperarioCertificacion.objects.get_or_create(
             operario=operarios[0],
             certificacion=certificaciones[0],
@@ -168,10 +168,10 @@ class Command(BaseCommand):
         )
         periodo1 = asignacion1.periodos.filter(esta_vigente=True).first()
         if periodo1:
-            # Resetear contador - los signals lo incrementarán al crear inspecciones
+            # Resetear contador - los signals sumarán las piezas al crear inspecciones
             periodo1.inspecciones_realizadas = 0
             periodo1.save()
-            self.stdout.write(f'  ✓ Asignación creada: {asignacion1.operario.nombre_completo} - {asignacion1.certificacion.nombre} (se crearán 25 inspecciones)')
+            self.stdout.write(f'  ✓ Asignación creada: {asignacion1.operario.nombre_completo} - {asignacion1.certificacion.nombre} (se crearán 25 piezas)')
 
         # Asignación 2: Operario con periodo recién iniciado (5/29 inspecciones)
         asignacion2, _ = OperarioCertificacion.objects.get_or_create(
@@ -187,7 +187,7 @@ class Command(BaseCommand):
         if periodo2:
             periodo2.inspecciones_realizadas = 0
             periodo2.save()
-            self.stdout.write(f'  ✓ Asignación creada: {asignacion2.operario.nombre_completo} - {asignacion2.certificacion.nombre} (se crearán 5 inspecciones)')
+            self.stdout.write(f'  ✓ Asignación creada: {asignacion2.operario.nombre_completo} - {asignacion2.certificacion.nombre} (se crearán 5 piezas)')
 
         # Asignación 3: Operario con múltiples certificaciones
         asignacion3a, _ = OperarioCertificacion.objects.get_or_create(
@@ -217,7 +217,7 @@ class Command(BaseCommand):
         if periodo3b:
             periodo3b.inspecciones_realizadas = 0
             periodo3b.save()
-        self.stdout.write(f'  ✓ Asignaciones creadas para {operarios[2].nombre_completo} (2 certificaciones, se crearán 15 y 10 inspecciones)')
+        self.stdout.write(f'  ✓ Asignaciones creadas para {operarios[2].nombre_completo} (2 certificaciones, se crearán 15 y 10 piezas)')
 
         # Asignación 4: Operario con periodo próximo a vencer
         fecha_asignacion4 = hoy - timedelta(days=170)  # Cerca del límite de 180 días
@@ -234,7 +234,7 @@ class Command(BaseCommand):
         if periodo4:
             periodo4.inspecciones_realizadas = 0
             periodo4.save()
-            self.stdout.write(f'  ✓ Asignación creada: {asignacion4.operario.nombre_completo} - {asignacion4.certificacion.nombre} (se crearán 20 inspecciones, próximo a vencer)')
+            self.stdout.write(f'  ✓ Asignación creada: {asignacion4.operario.nombre_completo} - {asignacion4.certificacion.nombre} (se crearán 20 piezas, próximo a vencer)')
 
         # Asignación 5: Operario nuevo sin inspecciones
         asignacion5, _ = OperarioCertificacion.objects.get_or_create(
@@ -249,17 +249,20 @@ class Command(BaseCommand):
         self.stdout.write(f'  ✓ Asignación creada: {asignacion5.operario.nombre_completo} - {asignacion5.certificacion.nombre} (0 inspecciones)')
 
         # Crear inspecciones de ejemplo
+        # IMPORTANTE: Se cuentan PIEZAS auditadas, no número de inspecciones
+        # El objetivo es alcanzar 29 PIEZAS por periodo, no 29 inspecciones
         self.stdout.write('Creando inspecciones de ejemplo...')
         asignaciones_con_periodos = [
-            (asignacion1, periodo1, 25),
-            (asignacion2, periodo2, 5),
-            (asignacion3a, periodo3a, 15),
-            (asignacion3b, periodo3b, 10),
-            (asignacion4, periodo4, 20),
+            (asignacion1, periodo1, 25),  # 25 piezas (pueden ser de varias inspecciones)
+            (asignacion2, periodo2, 5),   # 5 piezas
+            (asignacion3a, periodo3a, 15), # 15 piezas
+            (asignacion3b, periodo3b, 10), # 10 piezas
+            (asignacion4, periodo4, 20),  # 20 piezas
         ]
 
         total_inspecciones = 0
-        for asignacion, periodo, num_inspecciones in asignaciones_con_periodos:
+        total_piezas = 0
+        for asignacion, periodo, piezas_objetivo in asignaciones_con_periodos:
             if not periodo:
                 continue
             
@@ -268,19 +271,25 @@ class Command(BaseCommand):
             if not auditorias_cert:
                 continue
 
-            # Resetear contador antes de crear inspecciones (los signals lo incrementarán)
+            # Resetear contador antes de crear inspecciones (los signals sumarán las piezas)
             periodo.inspecciones_realizadas = 0
             periodo.save()
 
             # Crear inspecciones distribuidas en el periodo
+            # Cada inspección puede tener 1 o más piezas auditadas
+            # El objetivo es alcanzar el total de piezas requerido
             fecha_inicio = periodo.fecha_inicio_periodo
             fecha_fin = min(periodo.fecha_fin_periodo, hoy)
             dias_totales = max((fecha_fin - fecha_inicio).days, 1)
             
+            # Crear inspecciones hasta alcanzar el objetivo de piezas
+            piezas_creadas = 0
+            num_inspeccion = 0
             fechas_usadas = set()
-            for i in range(num_inspecciones):
+            
+            while piezas_creadas < piezas_objetivo:
                 # Distribuir las fechas a lo largo del periodo
-                dias_desde_inicio = int((i / max(num_inspecciones, 1)) * dias_totales) if num_inspecciones > 0 else 0
+                dias_desde_inicio = int((num_inspeccion / max(piezas_objetivo, 1)) * dias_totales) if piezas_objetivo > 0 else 0
                 fecha_inspeccion = fecha_inicio + timedelta(days=dias_desde_inicio)
                 
                 # Asegurar que sea día laborable
@@ -300,21 +309,32 @@ class Command(BaseCommand):
                 
                 fechas_usadas.add(fecha_inspeccion)
                 
-                # Crear inspección (el signal incrementará el contador automáticamente)
+                # Calcular cuántas piezas crear en esta inspección
+                # Puede ser 1 o más, pero no exceder el objetivo total
+                piezas_restantes = piezas_objetivo - piezas_creadas
+                piezas_en_inspeccion = min(random.randint(1, 10), piezas_restantes)  # Entre 1 y 10 piezas por inspección
+                
+                # Crear inspección (el signal sumará las piezas al contador automáticamente)
                 inspeccion = InspeccionProducto.objects.create(
                     operario_certificacion=asignacion,
                     periodo_validacion=periodo,
                     auditoria_producto=random.choice(auditorias_cert),
                     auditor=random.choice(auditores),
                     fecha_inspeccion=fecha_inspeccion,
-                    piezas_auditadas=random.randint(1, 50),
+                    piezas_auditadas=piezas_en_inspeccion,
                     resultado_inspeccion=random.choice(['OK', 'NO OK', None]),
-                    observaciones=f'Inspección de ejemplo {i+1}',
+                    observaciones=f'Inspección de ejemplo {num_inspeccion+1} ({piezas_en_inspeccion} piezas)',
                     usuario_creacion=admin_user
                 )
                 total_inspecciones += 1
+                piezas_creadas += piezas_en_inspeccion
+                num_inspeccion += 1
+                
+                # Si ya alcanzamos el objetivo, salir
+                if piezas_creadas >= piezas_objetivo:
+                    break
 
-        self.stdout.write(f'  ✓ {total_inspecciones} inspecciones creadas para los periodos activos')
+        self.stdout.write(f'  ✓ {total_inspecciones} inspecciones creadas (totalizando las piezas requeridas por periodo)')
 
         # Resumen
         self.stdout.write(self.style.SUCCESS('\n=== Resumen de datos creados ==='))

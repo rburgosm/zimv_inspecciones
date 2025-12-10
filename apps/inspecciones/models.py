@@ -10,7 +10,8 @@ from apps.auditores.models import Auditor
 class ConfiguracionInspecciones(models.Model):
     """Configuración global para inspecciones"""
     numero_dias_laborales_req = models.IntegerField(default=180, verbose_name="Número de días laborables requeridos")
-    inspecciones_minimas = models.IntegerField(default=29, verbose_name="Inspecciones mínimas")
+    inspecciones_minimas = models.IntegerField(default=29, verbose_name="Piezas mínimas requeridas",
+                                                help_text="Número total de piezas que deben ser auditadas por periodo (29 por defecto)")
     esta_activo = models.BooleanField(default=True, verbose_name="Está activo")
     fecha_inicio_vigencia = models.DateField(blank=True, null=True, verbose_name="Fecha inicio vigencia")
     fecha_fin_vigencia = models.DateField(blank=True, null=True, verbose_name="Fecha fin vigencia")
@@ -57,8 +58,10 @@ class PeriodoValidacionCertificacion(models.Model):
     fecha_inicio_periodo = models.DateField(verbose_name="Fecha inicio periodo")
     fecha_fin_periodo = models.DateField(verbose_name="Fecha fin periodo")
     numero_dias_laborales_req = models.IntegerField(default=180, verbose_name="Número de días laborables requeridos")
-    inspecciones_requeridas = models.IntegerField(default=29, verbose_name="Inspecciones requeridas")
-    inspecciones_realizadas = models.IntegerField(default=0, verbose_name="Inspecciones realizadas")
+    inspecciones_requeridas = models.IntegerField(default=29, verbose_name="Piezas requeridas",
+                                                   help_text="Número total de piezas que deben ser auditadas en este periodo (29 por defecto)")
+    inspecciones_realizadas = models.IntegerField(default=0, verbose_name="Piezas realizadas", 
+                                                  help_text="Total de piezas auditadas en este periodo (suma de piezas_auditadas de todas las inspecciones)")
     esta_completado = models.BooleanField(default=False, verbose_name="Está completado")
     fecha_completado = models.DateField(blank=True, null=True, verbose_name="Fecha completado")
     esta_vigente = models.BooleanField(default=True, verbose_name="Está vigente")

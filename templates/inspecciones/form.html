@@ -127,7 +127,7 @@ function cargarPeriodoVigente(asignacionId) {
             if (data.periodo) {
                 const fechaInicio = new Date(data.periodo.fecha_inicio).toLocaleDateString('es-ES');
                 const fechaFin = new Date(data.periodo.fecha_fin).toLocaleDateString('es-ES');
-                periodoDetails.textContent = `Periodo ${data.periodo.numero}: ${fechaInicio} - ${fechaFin} | Inspecciones: ${data.periodo.inspecciones_realizadas}/${data.periodo.inspecciones_requeridas}`;
+                periodoDetails.textContent = `Periodo ${data.periodo.numero}: ${fechaInicio} - ${fechaFin} | Piezas auditadas: ${data.periodo.inspecciones_realizadas}/${data.periodo.inspecciones_requeridas}`;
                 periodoInfo.classList.remove('hidden');
                 
                 // Establecer límites de fecha

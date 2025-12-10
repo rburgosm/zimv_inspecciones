@@ -129,8 +129,8 @@ def obtener_auditorias_por_certificacion(request):
                 'numero': periodo_vigente.numero_periodo,
                 'fecha_inicio': periodo_vigente.fecha_inicio_periodo.strftime('%Y-%m-%d'),
                 'fecha_fin': periodo_vigente.fecha_fin_periodo.strftime('%Y-%m-%d'),
-                'inspecciones_realizadas': periodo_vigente.inspecciones_realizadas,
-                'inspecciones_requeridas': periodo_vigente.inspecciones_requeridas,
+                'inspecciones_realizadas': periodo_vigente.inspecciones_realizadas,  # Total de piezas auditadas
+                'inspecciones_requeridas': periodo_vigente.inspecciones_requeridas,  # Piezas requeridas (29)
             }
         
         return JsonResponse(data)

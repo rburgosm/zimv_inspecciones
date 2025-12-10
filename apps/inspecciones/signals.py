@@ -10,23 +10,24 @@ from apps.asignaciones.utils import calcular_fecha_fin_periodo, siguiente_dia_la
 def actualizar_periodo_y_crear_siguiente(sender, instance, created, **kwargs):
     """
     Al registrar una inspección:
-    1. Incrementa el contador de inspecciones del periodo
-    2. Si llega a 29: marca periodo como completado y crea nuevo periodo
+    1. Suma las piezas auditadas al contador del periodo (no cuenta inspecciones, sino piezas)
+    2. Si llega a 29 piezas: marca periodo como completado y crea nuevo periodo
     3. Verifica si el periodo ha vencido sin completarse
     """
     if created:
         with transaction.atomic():
             periodo = instance.periodo_validacion
             
-            # Incrementar contador
-            periodo.inspecciones_realizadas += 1
+            # Sumar las piezas auditadas de esta inspección al contador total
+            # El contador almacena el total de piezas auditadas, no el número de inspecciones
+            periodo.inspecciones_realizadas += instance.piezas_auditadas
             periodo.save(update_fields=['inspecciones_realizadas', 'fecha_actualizacion'])
             
             config = ConfiguracionInspecciones.get_activa()
-            inspecciones_requeridas = config.inspecciones_minimas if config else 29
+            piezas_requeridas = config.inspecciones_minimas if config else 29
             
-            # Si se alcanza el número requerido de inspecciones
-            if periodo.inspecciones_realizadas >= inspecciones_requeridas:
+            # Si se alcanza el número requerido de piezas (29)
+            if periodo.inspecciones_realizadas >= piezas_requeridas:
                 # Marcar periodo como completado
                 periodo.esta_completado = True
                 periodo.esta_vigente = False
@@ -51,7 +52,7 @@ def actualizar_periodo_y_crear_siguiente(sender, instance, created, **kwargs):
                     fecha_inicio_periodo=fecha_inicio_nuevo,
                     fecha_fin_periodo=fecha_fin_nuevo,
                     numero_dias_laborales_req=dias_laborables,
-                    inspecciones_requeridas=inspecciones_requeridas,
+                    inspecciones_requeridas=piezas_requeridas,
                     inspecciones_realizadas=0,
                     esta_completado=False,
                     esta_vigente=True,

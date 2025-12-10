@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }} - Inspecciones Zimvie{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">{{ titulo }}</h1>
+        
+        <div class="bg-white shadow rounded-lg p-6">
+            <form method="post">
+                {% csrf_token %}
+                <div class="space-y-6">
+                    <div>
+                        <label for="{{ form.certificacion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.certificacion.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.certificacion }}
+                        {% if form.certificacion.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.certificacion.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.nombre.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.nombre.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.nombre }}
+                        {% if form.nombre.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.nombre.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.descripcion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.descripcion.label }}
+                        </label>
+                        {{ form.descripcion }}
+                        {% if form.descripcion.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.descripcion.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex items-center">
+                        {{ form.activa }}
+                        <label for="{{ form.activa.id_for_label }}" class="ml-2 block text-sm text-gray-900">
+                            {{ form.activa.label }}
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <a href="{% url 'auditorias:lista' %}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

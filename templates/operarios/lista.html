@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Operarios - Inspecciones Zimvie{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Operarios</h1>
+        <a href="{% url 'operarios:crear' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            + Nuevo Operario
+        </a>
+    </div>
+
+    <div class="bg-white shadow overflow-hidden sm:rounded-md">
+        <ul class="divide-y divide-gray-200">
+            {% for operario in operarios %}
+            <li>
+                <a href="{% url 'operarios:detalle' operario.pk %}" class="block hover:bg-gray-50">
+                    <div class="px-4 py-4 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <p class="text-sm font-medium text-blue-600 truncate">
+                                    {{ operario.nombre_completo }}
+                                </p>
+                                {% if operario.codigo %}
+                                <span class="ml-2 text-sm text-gray-500">({{ operario.codigo }})</span>
+                                {% endif %}
+                            </div>
+                            <div class="ml-2 flex-shrink-0 flex">
+                                {% if operario.activo %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Activo
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Inactivo
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </li>
+            {% empty %}
+            <li class="px-4 py-4 text-center text-gray-500">
+                No hay operarios registrados
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

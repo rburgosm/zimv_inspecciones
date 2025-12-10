@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }} - Inspecciones Zimvie{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">{{ titulo }}</h1>
+        
+        <div class="bg-white shadow rounded-lg p-6">
+            <form method="post">
+                {% csrf_token %}
+                <div class="space-y-6">
+                    <div>
+                        <label for="{{ form.operario.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.operario.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.operario }}
+                        {% if form.operario.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.operario.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.certificacion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.certificacion.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.certificacion }}
+                        {% if form.certificacion.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.certificacion.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.fecha_asignacion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.fecha_asignacion.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.fecha_asignacion }}
+                        {% if form.fecha_asignacion.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.fecha_asignacion.errors.0 }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-sm text-gray-500">Se creará automáticamente el periodo inicial de 180 días laborables.</p>
+                    </div>
+
+                    <div>
+                        <label for="{{ form.observaciones.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.observaciones.label }}
+                        </label>
+                        {{ form.observaciones }}
+                        {% if form.observaciones.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.observaciones.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <a href="{% url 'asignaciones:lista' %}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

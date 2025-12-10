@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }} - Inspecciones Zimvie{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">{{ titulo }}</h1>
+        
+        <div class="bg-white shadow rounded-lg p-6">
+            <form method="post">
+                {% csrf_token %}
+                <div class="space-y-6">
+                    <div>
+                        <label for="{{ form.operario_certificacion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.operario_certificacion.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.operario_certificacion }}
+                        {% if form.operario_certificacion.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.operario_certificacion.errors.0 }}</p>
+                        {% endif %}
+                        <div id="periodo-info" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md hidden">
+                            <p class="text-sm font-medium text-blue-900">Periodo Vigente:</p>
+                            <p class="text-sm text-blue-700" id="periodo-details"></p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="{{ form.auditoria_producto.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.auditoria_producto.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.auditoria_producto }}
+                        {% if form.auditoria_producto.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.auditoria_producto.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.auditor.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.auditor.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.auditor }}
+                        {% if form.auditor.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.auditor.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.fecha_inspeccion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.fecha_inspeccion.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.fecha_inspeccion }}
+                        {% if form.fecha_inspeccion.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.fecha_inspeccion.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.piezas_auditadas.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.piezas_auditadas.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.piezas_auditadas }}
+                        {% if form.piezas_auditadas.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.piezas_auditadas.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.resultado_inspeccion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.resultado_inspeccion.label }}
+                        </label>
+                        {{ form.resultado_inspeccion }}
+                        {% if form.resultado_inspeccion.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.resultado_inspeccion.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.observaciones.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.observaciones.label }}
+                        </label>
+                        {{ form.observaciones }}
+                        {% if form.observaciones.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.observaciones.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <a href="{% url 'inspecciones:lista' %}" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function cargarPeriodoVigente(asignacionId) {
+    if (!asignacionId) {
+        document.getElementById('periodo-info').classList.add('hidden');
+        document.getElementById('id_auditoria_producto').innerHTML = '<option value="">Seleccione primero una asignación</option>';
+        return;
+    }
+    
+    fetch(`{% url 'inspecciones:api_auditorias' %}?asignacion_id=${asignacionId}`)
+        .then(response => response.json())
+        .then(data => {
+            // Actualizar auditorías
+            const selectAuditoria = document.getElementById('id_auditoria_producto');
+            selectAuditoria.innerHTML = '<option value="">---------</option>';
+            data.auditorias.forEach(auditoria => {
+                const option = document.createElement('option');
+                option.value = auditoria.id;
+                option.textContent = auditoria.nombre;
+                selectAuditoria.appendChild(option);
+            });
+            
+            // Mostrar información del periodo
+            const periodoInfo = document.getElementById('periodo-info');
+            const periodoDetails = document.getElementById('periodo-details');
+            
+            if (data.periodo) {
+                const fechaInicio = new Date(data.periodo.fecha_inicio).toLocaleDateString('es-ES');
+                const fechaFin = new Date(data.periodo.fecha_fin).toLocaleDateString('es-ES');
+                periodoDetails.textContent = `Periodo ${data.periodo.numero}: ${fechaInicio} - ${fechaFin} | Inspecciones: ${data.periodo.inspecciones_realizadas}/${data.periodo.inspecciones_requeridas}`;
+                periodoInfo.classList.remove('hidden');
+                
+                // Establecer límites de fecha
+                const fechaInput = document.getElementById('id_fecha_inspeccion');
+                fechaInput.min = data.periodo.fecha_inicio;
+                fechaInput.max = data.periodo.fecha_fin;
+            } else {
+                periodoInfo.classList.add('hidden');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('periodo-info').classList.add('hidden');
+        });
+}
+
+// Cargar periodo al cambiar la asignación
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAsignacion = document.getElementById('id_operario_certificacion');
+    if (selectAsignacion.value) {
+        cargarPeriodoVigente(selectAsignacion.value);
+    }
+    selectAsignacion.addEventListener('change', function() {
+        cargarPeriodoVigente(this.value);
+    });
+});
+</script>
+{% endblock %}

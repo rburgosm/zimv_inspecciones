@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}Asignaciones - Inspecciones Zimvie{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Asignaciones Operario-Certificación</h1>
+        <a href="{% url 'asignaciones:crear' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            + Nueva Asignación
+        </a>
+    </div>
+
+    <div class="bg-white shadow rounded-lg p-4 mb-6">
+        <form method="get" class="flex items-center space-x-4">
+            <label for="operario" class="text-sm font-medium text-gray-700">Filtrar por operario:</label>
+            <select name="operario" id="operario" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="">Todos</option>
+                {% for operario in operarios %}
+                <option value="{{ operario.pk }}" {% if operario_filtro == operario.pk %}selected{% endif %}>
+                    {{ operario.nombre_completo }}
+                </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                Filtrar
+            </button>
+        </form>
+    </div>
+
+    <div class="bg-white shadow overflow-hidden sm:rounded-md">
+        <ul class="divide-y divide-gray-200">
+            {% for asignacion in asignaciones %}
+            <li>
+                <a href="{% url 'asignaciones:detalle' asignacion.pk %}" class="block hover:bg-gray-50">
+                    <div class="px-4 py-4 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-blue-600">
+                                    {{ asignacion.operario.nombre_completo }} - {{ asignacion.certificacion.nombre }}
+                                </p>
+                                <p class="mt-1 text-sm text-gray-500">
+                                    Asignada el {{ asignacion.fecha_asignacion|date:"d/m/Y" }}
+                                </p>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                {% if asignacion.esta_activa %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Activa
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Caducada
+                                </span>
+                                {% if asignacion.fecha_caducidad %}
+                                <span class="text-sm text-gray-500">
+                                    Caducó: {{ asignacion.fecha_caducidad|date:"d/m/Y" }}
+                                </span>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </li>
+            {% empty %}
+            <li class="px-4 py-4 text-center text-gray-500">
+                No hay asignaciones registradas
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

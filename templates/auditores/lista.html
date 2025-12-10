@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Auditores - Inspecciones Zimvie{% endblock %}
+
+{% block content %}
+<div class="py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Auditores</h1>
+        <a href="{% url 'auditores:crear' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            + Nuevo Auditor
+        </a>
+    </div>
+
+    <div class="bg-white shadow overflow-hidden sm:rounded-md">
+        <ul class="divide-y divide-gray-200">
+            {% for auditor in auditores %}
+            <li>
+                <div class="px-4 py-4 sm:px-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-blue-600">
+                                {{ auditor.nombre_completo }}
+                            </p>
+                            {% if auditor.codigo %}
+                            <p class="mt-1 text-sm text-gray-500">Código: {{ auditor.codigo }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            {% if auditor.activo %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Activo
+                            </span>
+                            {% else %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                Inactivo
+                            </span>
+                            {% endif %}
+                            <a href="{% url 'auditores:editar' auditor.pk %}" class="text-blue-600 hover:text-blue-800">
+                                Editar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            {% empty %}
+            <li class="px-4 py-4 text-center text-gray-500">
+                No hay auditores registrados
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

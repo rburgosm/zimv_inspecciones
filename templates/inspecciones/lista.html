@@ -12,7 +12,7 @@
     </div>
 
     <div class="bg-white shadow rounded-lg p-4 mb-6">
-        <form method="get" class="flex items-center space-x-4">
+        <form method="get" id="filtro-form" class="flex items-center space-x-4">
             <label for="asignacion" class="text-sm font-medium text-gray-700">Filtrar por asignación:</label>
             <select name="asignacion" id="asignacion" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                 <option value="">Todas</option>
@@ -25,6 +25,11 @@
             <button type="submit" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                 Filtrar
             </button>
+            {% if asignacion_filtro %}
+            <a href="{% url 'inspecciones:lista' %}" class="text-sm text-blue-600 hover:text-blue-800">
+                Limpiar filtro
+            </a>
+            {% endif %}
         </form>
     </div>
 
@@ -91,4 +96,18 @@
         </div>
     </div>
 </div>
+
+<script>
+// Auto-submit al cambiar la selección
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAsignacion = document.getElementById('asignacion');
+    const formFiltro = document.getElementById('filtro-form');
+    
+    if (selectAsignacion && formFiltro) {
+        selectAsignacion.addEventListener('change', function() {
+            formFiltro.submit();
+        });
+    }
+});
+</script>
 {% endblock %}

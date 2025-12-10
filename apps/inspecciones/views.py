@@ -23,21 +23,33 @@ def lista_inspecciones(request):
     ).all().order_by('-fecha_inspeccion', '-fecha_creacion')
     
     # Filtros
-    operario_cert_id = request.GET.get('asignacion')
-    periodo_id = request.GET.get('periodo')
+    operario_cert_id = request.GET.get('asignacion', '').strip()
+    periodo_id = request.GET.get('periodo', '').strip()
+    
+    asignacion_filtro = None
+    periodo_filtro = None
     
     if operario_cert_id:
-        inspecciones = inspecciones.filter(operario_certificacion_id=operario_cert_id)
-    if periodo_id:
-        inspecciones = inspecciones.filter(periodo_validacion_id=periodo_id)
+        try:
+            asignacion_filtro = int(operario_cert_id)
+            inspecciones = inspecciones.filter(operario_certificacion_id=asignacion_filtro)
+        except (ValueError, TypeError):
+            asignacion_filtro = None
     
-    asignaciones = OperarioCertificacion.objects.filter(esta_activa=True).select_related('operario', 'certificacion')
+    if periodo_id:
+        try:
+            periodo_filtro = int(periodo_id)
+            inspecciones = inspecciones.filter(periodo_validacion_id=periodo_filtro)
+        except (ValueError, TypeError):
+            periodo_filtro = None
+    
+    asignaciones = OperarioCertificacion.objects.filter(esta_activa=True).select_related('operario', 'certificacion').order_by('operario__nombre', 'certificacion__nombre')
     
     return render(request, 'inspecciones/lista.html', {
         'inspecciones': inspecciones,
         'asignaciones': asignaciones,
-        'asignacion_filtro': int(operario_cert_id) if operario_cert_id else None,
-        'periodo_filtro': int(periodo_id) if periodo_id else None,
+        'asignacion_filtro': asignacion_filtro,
+        'periodo_filtro': periodo_filtro,
     })
 
 
@@ -53,6 +65,10 @@ def crear_inspeccion(request):
             
             # Validar que la fecha esté dentro del periodo
             periodo = inspeccion.periodo_validacion
+            if not periodo:
+                messages.error(request, 'No se pudo determinar el periodo de validación')
+                return render(request, 'inspecciones/form.html', {'form': form, 'titulo': 'Crear Inspección'})
+            
             if inspeccion.fecha_inspeccion < periodo.fecha_inicio_periodo:
                 messages.error(request, 'La fecha de inspección no puede ser anterior al inicio del periodo')
                 return render(request, 'inspecciones/form.html', {'form': form, 'titulo': 'Crear Inspección'})
@@ -65,10 +81,18 @@ def crear_inspeccion(request):
                 messages.error(request, 'No se pueden registrar inspecciones en periodos no vigentes')
                 return render(request, 'inspecciones/form.html', {'form': form, 'titulo': 'Crear Inspección'})
             
-            inspeccion.save()
-            # El contador y la lógica de periodos se manejan mediante signal
-            messages.success(request, 'Inspección registrada correctamente')
-            return redirect('inspecciones:lista')
+            try:
+                inspeccion.save()
+                # El contador y la lógica de periodos se manejan mediante signal
+                messages.success(request, 'Inspección registrada correctamente')
+                return redirect('inspecciones:lista')
+            except Exception as e:
+                messages.error(request, f'Error al guardar la inspección: {str(e)}')
+        else:
+            # Mostrar errores del formulario
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
     else:
         form = InspeccionProductoForm()
     
@@ -93,19 +117,60 @@ def detalle_inspeccion(request, pk):
 
 
 @login_required
+def obtener_certificaciones_por_operario(request):
+    """Vista AJAX para obtener certificaciones según el operario seleccionado"""
+    from django.http import JsonResponse
+    from apps.asignaciones.models import OperarioCertificacion
+    from apps.certificaciones.models import Certificacion
+    
+    operario_id = request.GET.get('operario_id')
+    
+    if not operario_id:
+        return JsonResponse({'error': 'ID de operario requerido'}, status=400)
+    
+    try:
+        certificaciones_ids = OperarioCertificacion.objects.filter(
+            operario_id=operario_id,
+            esta_activa=True
+        ).values_list('certificacion_id', flat=True)
+        
+        certificaciones = Certificacion.objects.filter(
+            id__in=certificaciones_ids,
+            activa=True
+        ).order_by('nombre')
+        
+        data = {
+            'certificaciones': [
+                {'id': c.id, 'nombre': c.nombre} for c in certificaciones
+            ]
+        }
+        
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
 def obtener_auditorias_por_certificacion(request):
-    """Vista AJAX para obtener auditorías según la asignación seleccionada"""
+    """Vista AJAX para obtener auditorías según la certificación seleccionada"""
     from django.http import JsonResponse
     from apps.asignaciones.models import OperarioCertificacion
     from apps.auditorias.models import AuditoriaProducto
     
-    asignacion_id = request.GET.get('asignacion_id')
+    operario_id = request.GET.get('operario_id')
+    certificacion_id = request.GET.get('certificacion_id')
     
-    if not asignacion_id:
-        return JsonResponse({'error': 'ID de asignación requerido'}, status=400)
+    if not operario_id or not certificacion_id:
+        return JsonResponse({'error': 'ID de operario y certificación requeridos'}, status=400)
     
     try:
-        asignacion = OperarioCertificacion.objects.get(pk=asignacion_id)
+        # Buscar la asignación
+        asignacion = OperarioCertificacion.objects.get(
+            operario_id=operario_id,
+            certificacion_id=certificacion_id,
+            esta_activa=True
+        )
+        
         auditorias = AuditoriaProducto.objects.filter(
             certificacion=asignacion.certificacion,
             activa=True
@@ -129,8 +194,8 @@ def obtener_auditorias_por_certificacion(request):
                 'numero': periodo_vigente.numero_periodo,
                 'fecha_inicio': periodo_vigente.fecha_inicio_periodo.strftime('%Y-%m-%d'),
                 'fecha_fin': periodo_vigente.fecha_fin_periodo.strftime('%Y-%m-%d'),
-                'inspecciones_realizadas': periodo_vigente.inspecciones_realizadas,  # Total de piezas auditadas
-                'inspecciones_requeridas': periodo_vigente.inspecciones_requeridas,  # Piezas requeridas (29)
+                'inspecciones_realizadas': periodo_vigente.inspecciones_realizadas,
+                'inspecciones_requeridas': periodo_vigente.inspecciones_requeridas,
             }
         
         return JsonResponse(data)

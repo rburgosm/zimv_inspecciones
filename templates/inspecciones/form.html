@@ -8,22 +8,50 @@
         <h1 class="text-3xl font-bold text-gray-900 mb-6">{{ titulo }}</h1>
         
         <div class="bg-white shadow rounded-lg p-6">
+            {% if messages %}
+            <div class="mb-4">
+                {% for message in messages %}
+                <div class="p-3 mb-2 rounded {% if message.tags == 'error' %}bg-red-100 text-red-700{% elif message.tags == 'success' %}bg-green-100 text-green-700{% else %}bg-blue-100 text-blue-700{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            {% if form.non_field_errors %}
+            <div class="mb-4 p-3 bg-red-100 text-red-700 rounded">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+            
             <form method="post">
                 {% csrf_token %}
                 <div class="space-y-6">
                     <div>
-                        <label for="{{ form.operario_certificacion.id_for_label }}" class="block text-sm font-medium text-gray-700">
-                            {{ form.operario_certificacion.label }} <span class="text-red-500">*</span>
+                        <label for="{{ form.operario.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.operario.label }} <span class="text-red-500">*</span>
                         </label>
-                        {{ form.operario_certificacion }}
-                        {% if form.operario_certificacion.errors %}
-                        <p class="mt-1 text-sm text-red-600">{{ form.operario_certificacion.errors.0 }}</p>
+                        {{ form.operario }}
+                        {% if form.operario.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.operario.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.certificacion.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.certificacion.label }} <span class="text-red-500">*</span>
+                        </label>
+                        {{ form.certificacion }}
+                        {% if form.certificacion.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.certificacion.errors.0 }}</p>
                         {% endif %}
                         <div id="periodo-info" class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md hidden">
                             <p class="text-sm font-medium text-blue-900">Periodo Vigente:</p>
                             <p class="text-sm text-blue-700" id="periodo-details"></p>
                         </div>
                     </div>
+
+                    {{ form.operario_certificacion }}
 
                     <div>
                         <label for="{{ form.auditoria_producto.id_for_label }}" class="block text-sm font-medium text-gray-700">
@@ -84,6 +112,19 @@
                         <p class="mt-1 text-sm text-red-600">{{ form.observaciones.errors.0 }}</p>
                         {% endif %}
                     </div>
+
+                    <div>
+                        <label for="{{ form.numero_orden.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                            {{ form.numero_orden.label }}
+                        </label>
+                        {{ form.numero_orden }}
+                        {% if form.numero_orden.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.numero_orden.errors.0 }}</p>
+                        {% endif %}
+                        {% if form.numero_orden.help_text %}
+                        <p class="mt-1 text-sm text-gray-500">{{ form.numero_orden.help_text }}</p>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <div class="mt-6 flex justify-end space-x-3">
@@ -100,18 +141,54 @@
 </div>
 
 <script>
-function cargarPeriodoVigente(asignacionId) {
-    if (!asignacionId) {
-        document.getElementById('periodo-info').classList.add('hidden');
-        document.getElementById('id_auditoria_producto').innerHTML = '<option value="">Seleccione primero una asignación</option>';
+function cargarCertificaciones(operarioId) {
+    const selectCertificacion = document.getElementById('id_certificacion');
+    const selectAuditoria = document.getElementById('id_auditoria_producto');
+    const periodoInfo = document.getElementById('periodo-info');
+    
+    if (!operarioId) {
+        selectCertificacion.innerHTML = '<option value="">---------</option>';
+        selectAuditoria.innerHTML = '<option value="">Seleccione primero un operario y certificación</option>';
+        periodoInfo.classList.add('hidden');
         return;
     }
     
-    fetch(`{% url 'inspecciones:api_auditorias' %}?asignacion_id=${asignacionId}`)
+    fetch(`{% url 'inspecciones:api_certificaciones' %}?operario_id=${operarioId}`)
+        .then(response => response.json())
+        .then(data => {
+            selectCertificacion.innerHTML = '<option value="">---------</option>';
+            data.certificaciones.forEach(certificacion => {
+                const option = document.createElement('option');
+                option.value = certificacion.id;
+                option.textContent = certificacion.nombre;
+                selectCertificacion.appendChild(option);
+            });
+            
+            // Limpiar auditorías y periodo
+            selectAuditoria.innerHTML = '<option value="">Seleccione una certificación</option>';
+            periodoInfo.classList.add('hidden');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            selectCertificacion.innerHTML = '<option value="">Error al cargar certificaciones</option>';
+        });
+}
+
+function cargarAuditoriasYPeriodo(operarioId, certificacionId) {
+    const selectAuditoria = document.getElementById('id_auditoria_producto');
+    const periodoInfo = document.getElementById('periodo-info');
+    const periodoDetails = document.getElementById('periodo-details');
+    
+    if (!operarioId || !certificacionId) {
+        selectAuditoria.innerHTML = '<option value="">Seleccione primero un operario y certificación</option>';
+        periodoInfo.classList.add('hidden');
+        return;
+    }
+    
+    fetch(`{% url 'inspecciones:api_auditorias' %}?operario_id=${operarioId}&certificacion_id=${certificacionId}`)
         .then(response => response.json())
         .then(data => {
             // Actualizar auditorías
-            const selectAuditoria = document.getElementById('id_auditoria_producto');
             selectAuditoria.innerHTML = '<option value="">---------</option>';
             data.auditorias.forEach(auditoria => {
                 const option = document.createElement('option');
@@ -121,9 +198,6 @@ function cargarPeriodoVigente(asignacionId) {
             });
             
             // Mostrar información del periodo
-            const periodoInfo = document.getElementById('periodo-info');
-            const periodoDetails = document.getElementById('periodo-details');
-            
             if (data.periodo) {
                 const fechaInicio = new Date(data.periodo.fecha_inicio).toLocaleDateString('es-ES');
                 const fechaFin = new Date(data.periodo.fecha_fin).toLocaleDateString('es-ES');
@@ -140,19 +214,37 @@ function cargarPeriodoVigente(asignacionId) {
         })
         .catch(error => {
             console.error('Error:', error);
-            document.getElementById('periodo-info').classList.add('hidden');
+            selectAuditoria.innerHTML = '<option value="">Error al cargar auditorías</option>';
+            periodoInfo.classList.add('hidden');
         });
 }
 
-// Cargar periodo al cambiar la asignación
+// Event listeners
 document.addEventListener('DOMContentLoaded', function() {
-    const selectAsignacion = document.getElementById('id_operario_certificacion');
-    if (selectAsignacion.value) {
-        cargarPeriodoVigente(selectAsignacion.value);
-    }
-    selectAsignacion.addEventListener('change', function() {
-        cargarPeriodoVigente(this.value);
+    const selectOperario = document.getElementById('id_operario');
+    const selectCertificacion = document.getElementById('id_certificacion');
+    
+    // Cargar certificaciones al cambiar el operario
+    selectOperario.addEventListener('change', function() {
+        cargarCertificaciones(this.value);
     });
+    
+    // Cargar auditorías y periodo al cambiar la certificación
+    selectCertificacion.addEventListener('change', function() {
+        const operarioId = selectOperario.value;
+        const certificacionId = this.value;
+        cargarAuditoriasYPeriodo(operarioId, certificacionId);
+    });
+    
+    // Si hay valores iniciales, cargar datos
+    if (selectOperario.value) {
+        cargarCertificaciones(selectOperario.value);
+        if (selectCertificacion.value) {
+            setTimeout(() => {
+                cargarAuditoriasYPeriodo(selectOperario.value, selectCertificacion.value);
+            }, 100);
+        }
+    }
 });
 </script>
 {% endblock %}

@@ -65,4 +65,52 @@
         </div>
     </div>
 </div>
+
+<script>
+function cargarCertificacionesDisponibles(operarioId) {
+    const selectCertificacion = document.getElementById('id_certificacion');
+    
+    if (!operarioId) {
+        selectCertificacion.innerHTML = '<option value="">---------</option>';
+        return;
+    }
+    
+    const url = `{% url 'asignaciones:api_certificaciones_disponibles' %}?operario_id=${operarioId}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            selectCertificacion.innerHTML = '<option value="">---------</option>';
+            if (data.certificaciones && data.certificaciones.length > 0) {
+                data.certificaciones.forEach(certificacion => {
+                    const option = document.createElement('option');
+                    option.value = certificacion.id;
+                    option.textContent = certificacion.nombre;
+                    selectCertificacion.appendChild(option);
+                });
+            } else {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No hay certificaciones disponibles (todas están asignadas)';
+                option.disabled = true;
+                selectCertificacion.appendChild(option);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            selectCertificacion.innerHTML = '<option value="">Error al cargar certificaciones</option>';
+        });
+}
+
+// Event listener para cuando cambie el operario
+document.addEventListener('DOMContentLoaded', function() {
+    const selectOperario = document.getElementById('id_operario');
+    
+    if (selectOperario) {
+        selectOperario.addEventListener('change', function() {
+            cargarCertificacionesDisponibles(this.value);
+        });
+    }
+});
+</script>
 {% endblock %}

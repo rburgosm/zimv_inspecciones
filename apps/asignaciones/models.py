@@ -56,3 +56,21 @@ class OperarioCertificacion(models.Model):
         if self.fecha_caducidad and self.fecha_asignacion:
             if self.fecha_caducidad < self.fecha_asignacion:
                 raise ValidationError("La fecha de caducidad no puede ser anterior a la fecha de asignación")
+        
+        # Validar que el operario no tenga ya esta certificación asignada (activa)
+        if self.operario and self.certificacion:
+            asignaciones_existentes = OperarioCertificacion.objects.filter(
+                operario=self.operario,
+                certificacion=self.certificacion,
+                esta_activa=True
+            )
+            
+            # Si estamos editando, excluir la instancia actual
+            if self.pk:
+                asignaciones_existentes = asignaciones_existentes.exclude(pk=self.pk)
+            
+            if asignaciones_existentes.exists():
+                raise ValidationError(
+                    f"El operario {self.operario.nombre_completo} ya tiene asignada la certificación "
+                    f"{self.certificacion.nombre}. No se puede asignar la misma certificación dos veces."
+                )

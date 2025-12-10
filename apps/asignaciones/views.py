@@ -64,3 +64,47 @@ def detalle_asignacion(request, pk):
         'asignacion': asignacion,
         'periodos': periodos
     })
+
+
+@login_required
+def obtener_certificaciones_disponibles(request):
+    """Vista AJAX para obtener certificaciones disponibles (no asignadas) para un operario"""
+    from django.http import JsonResponse
+    from apps.certificaciones.models import Certificacion
+    
+    operario_id = request.GET.get('operario_id')
+    asignacion_id = request.GET.get('asignacion_id')  # Para edición
+    
+    if not operario_id:
+        return JsonResponse({'error': 'ID de operario requerido'}, status=400)
+    
+    try:
+        # Obtener certificaciones ya asignadas a este operario (activas)
+        certificaciones_asignadas = OperarioCertificacion.objects.filter(
+            operario_id=operario_id,
+            esta_activa=True
+        )
+        
+        # Si estamos editando, excluir la asignación actual
+        if asignacion_id:
+            try:
+                certificaciones_asignadas = certificaciones_asignadas.exclude(pk=int(asignacion_id))
+            except (ValueError,):
+                pass
+        
+        certificaciones_ids = certificaciones_asignadas.values_list('certificacion_id', flat=True)
+        
+        # Obtener certificaciones disponibles (activas y no asignadas)
+        certificaciones = Certificacion.objects.filter(
+            activa=True
+        ).exclude(id__in=certificaciones_ids).order_by('nombre')
+        
+        data = {
+            'certificaciones': [
+                {'id': c.id, 'nombre': c.nombre} for c in certificaciones
+            ]
+        }
+        
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

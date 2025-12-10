@@ -145,6 +145,8 @@ class InspeccionProducto(models.Model):
         verbose_name="Resultado inspección"
     )
     observaciones = models.TextField(blank=True, null=True, verbose_name="Observaciones")
+    numero_orden = models.CharField(max_length=100, blank=True, null=True, verbose_name="Número de orden",
+                                    help_text="Número de orden que generó las piezas")
     fecha_creacion = models.DateTimeField(default=timezone.now, verbose_name="Fecha de creación")
     usuario_creacion = models.ForeignKey(
         User,

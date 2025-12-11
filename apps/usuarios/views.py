@@ -56,64 +56,86 @@ def home_view(request):
     
     periodos_vigentes_lista = []
     periodos_criticos_lista = []
+
+    niveles = {'critico': 0, 'alto': 1, 'medio': 2, 'normal': 3}
+
+    def escalar(nivel_actual, nivel_nuevo):
+        """Devuelve el nivel más severo entre actual y nuevo."""
+        return nivel_nuevo if niveles.get(nivel_nuevo, 3) < niveles.get(nivel_actual, 3) else nivel_actual
+
+    def evaluar_criticidad(periodo):
+        dias_restantes = (periodo.fecha_fin_periodo - hoy).days
+        dias_transcurridos = max((hoy - periodo.fecha_inicio_periodo).days, 0)
+        dias_totales = max((periodo.fecha_fin_periodo - periodo.fecha_inicio_periodo).days, 1)
+
+        porcentaje_piezas = (periodo.inspecciones_realizadas / periodo.inspecciones_requeridas * 100) if periodo.inspecciones_requeridas > 0 else 0
+        porcentaje_tiempo = (dias_transcurridos / dias_totales * 100)
+
+        nivel_criticidad = 'normal'
+        es_critico = False
+
+        # C0: periodo vencido pero marcado como vigente -> crítico duro
+        if dias_restantes <= 0:
+            return True, 'critico'
+
+        # C1: Vence en <=30 días
+        if dias_restantes <= 30:
+            es_critico = True
+            if dias_restantes <= 7:
+                nivel_criticidad = escalar(nivel_criticidad, 'critico')
+            elif dias_restantes <= 15:
+                nivel_criticidad = escalar(nivel_criticidad, 'alto')
+            else:
+                nivel_criticidad = escalar(nivel_criticidad, 'medio')
+
+        # C2: <50% piezas y >50% tiempo
+        if porcentaje_piezas < 50 and porcentaje_tiempo > 50:
+            es_critico = True
+            if porcentaje_piezas < 25:
+                nivel_criticidad = escalar(nivel_criticidad, 'critico')
+            elif porcentaje_piezas < 35:
+                nivel_criticidad = escalar(nivel_criticidad, 'alto')
+            else:
+                nivel_criticidad = escalar(nivel_criticidad, 'medio')
+
+        # C3: <10 piezas y <60 días restantes
+        if periodo.inspecciones_realizadas < 10 and dias_restantes < 60:
+            es_critico = True
+            nivel_criticidad = escalar(nivel_criticidad, 'alto')
+
+        # C4: <40% piezas y >40% tiempo
+        if porcentaje_piezas < 40 and porcentaje_tiempo > 40:
+            es_critico = True
+            if porcentaje_piezas < 20:
+                nivel_criticidad = escalar(nivel_criticidad, 'critico')
+            elif porcentaje_piezas < 30:
+                nivel_criticidad = escalar(nivel_criticidad, 'alto')
+            else:
+                nivel_criticidad = escalar(nivel_criticidad, 'medio')
+
+        # C5: <=90 días restantes y <60% piezas
+        if dias_restantes <= 90 and porcentaje_piezas < 60:
+            es_critico = True
+            if dias_restantes <= 30:
+                nivel_criticidad = escalar(nivel_criticidad, 'critico')
+            elif dias_restantes <= 60:
+                nivel_criticidad = escalar(nivel_criticidad, 'alto')
+            else:
+                nivel_criticidad = escalar(nivel_criticidad, 'medio')
+
+        return es_critico, nivel_criticidad
     
     # Calcular criticidad y métricas por periodo
     for periodo in periodos_vigentes_qs:
         dias_restantes = (periodo.fecha_fin_periodo - hoy).days
-        dias_transcurridos = (hoy - periodo.fecha_inicio_periodo).days
-        dias_totales = (periodo.fecha_fin_periodo - periodo.fecha_inicio_periodo).days
-        
+        dias_transcurridos = max((hoy - periodo.fecha_inicio_periodo).days, 0)
+        dias_totales = max((periodo.fecha_fin_periodo - periodo.fecha_inicio_periodo).days, 1)
+
         porcentaje_piezas = (periodo.inspecciones_realizadas / periodo.inspecciones_requeridas * 100) if periodo.inspecciones_requeridas > 0 else 0
-        porcentaje_tiempo = (dias_transcurridos / dias_totales * 100) if dias_totales > 0 else 0
-        
-        es_critico = False
-        nivel_criticidad = 'normal'
-        
-        # Criterio 1: Vence en menos de 30 días
-        if dias_restantes <= 30 and dias_restantes > 0:
-            es_critico = True
-            if dias_restantes <= 7:
-                nivel_criticidad = 'critico'
-            elif dias_restantes <= 15:
-                nivel_criticidad = 'alto'
-            else:
-                nivel_criticidad = 'medio'
-        
-        # Criterio 2: Menos del 50% de piezas y más del 50% del tiempo transcurrido
-        if porcentaje_piezas < 50 and porcentaje_tiempo > 50:
-            es_critico = True
-            if porcentaje_piezas < 25:
-                nivel_criticidad = 'critico'
-            elif porcentaje_piezas < 35:
-                nivel_criticidad = 'alto'
-            else:
-                nivel_criticidad = 'medio'
-        
-        # Criterio 3: Menos de 10 piezas y quedan menos de 60 días
-        if periodo.inspecciones_realizadas < 10 and dias_restantes < 60 and dias_restantes > 0:
-            es_critico = True
-            nivel_criticidad = 'alto'
-        
-        # Criterio 4: Menos del 40% de piezas y más del 40% del tiempo (más flexible)
-        if porcentaje_piezas < 40 and porcentaje_tiempo > 40:
-            es_critico = True
-            if porcentaje_piezas < 20:
-                nivel_criticidad = 'critico'
-            elif porcentaje_piezas < 30:
-                nivel_criticidad = 'alto'
-            else:
-                nivel_criticidad = 'medio'
-        
-        # Criterio 5: Vence en menos de 90 días y tiene menos del 60% de piezas
-        if dias_restantes <= 90 and dias_restantes > 0 and porcentaje_piezas < 60:
-            es_critico = True
-            if dias_restantes <= 30:
-                nivel_criticidad = 'critico' if nivel_criticidad == 'normal' else nivel_criticidad
-            elif dias_restantes <= 60:
-                nivel_criticidad = 'alto' if nivel_criticidad == 'normal' else nivel_criticidad
-            else:
-                nivel_criticidad = 'medio' if nivel_criticidad == 'normal' else nivel_criticidad
-        
+        porcentaje_tiempo = (dias_transcurridos / dias_totales * 100)
+
+        es_critico, nivel_criticidad = evaluar_criticidad(periodo)
+
         periodo_data = {
             'periodo': periodo,
             'dias_restantes': dias_restantes,
@@ -123,13 +145,21 @@ def home_view(request):
             'piezas_faltantes': periodo.inspecciones_requeridas - periodo.inspecciones_realizadas
         }
         periodos_vigentes_lista.append(periodo_data)
-        
+
         if es_critico:
             periodos_criticos_lista.append(periodo_data)
     
-    # Ordenar por nivel de criticidad y días restantes
+    # Ordenar todos los vigentes por criticidad y distancia a completarse
+    periodos_vigentes_lista.sort(key=lambda x: (
+        niveles.get(x['nivel_criticidad'], 3),
+        -x['piezas_faltantes'],  # más lejos de completar primero
+        x['dias_restantes']
+    ))
+
+    # Ordenar críticos por severidad, avance y proximidad de vencimiento
     periodos_criticos_lista.sort(key=lambda x: (
-        {'critico': 0, 'alto': 1, 'medio': 2, 'normal': 3}[x['nivel_criticidad']],
+        niveles.get(x['nivel_criticidad'], 3),
+        x['porcentaje_piezas'],  # menos avance primero
         x['dias_restantes']
     ))
     

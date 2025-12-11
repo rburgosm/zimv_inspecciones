@@ -97,16 +97,18 @@ class Command(BaseCommand):
             ultimo_numero = periodos_actuales.last().numero_periodo if total_actual else 0
             siguiente_numero = ultimo_numero + 1
 
-            # Retroceder en el tiempo para crear historiales previos sin solapar al vigente
-            fecha_cursor = periodo_vigente.fecha_inicio_periodo - timedelta(days=dias_laborales + 5)
-
-            for _ in range(periodos_minimos - total_actual):
-                fecha_fin_cursor = fecha_cursor + timedelta(days=dias_laborales)
+            # Construir periodos históricos contiguos: el fin de uno es el inicio del siguiente (sin huecos)
+            # Usamos límites inclusivos: fin = inicio siguiente - 1 día
+            missing = periodos_minimos - total_actual
+            next_start = periodo_vigente.fecha_inicio_periodo
+            for _ in range(missing):
+                fecha_fin_cursor = next_start - timedelta(days=1)
+                fecha_inicio_cursor = fecha_fin_cursor - timedelta(days=dias_laborales - 1)
                 PeriodoValidacionCertificacion.objects.get_or_create(
                     operario_certificacion=asignacion,
                     numero_periodo=siguiente_numero,
                     defaults={
-                        'fecha_inicio_periodo': fecha_cursor,
+                        'fecha_inicio_periodo': fecha_inicio_cursor,
                         'fecha_fin_periodo': fecha_fin_cursor,
                         'numero_dias_laborales_req': dias_laborales,
                         'inspecciones_requeridas': piezas_requeridas,
@@ -118,8 +120,7 @@ class Command(BaseCommand):
                     }
                 )
                 siguiente_numero += 1
-                # Dejar un pequeño hueco entre periodos históricos
-                fecha_cursor -= timedelta(days=dias_laborales + 5)
+                next_start = fecha_inicio_cursor
 
             # Asegurar que el vigente quede con el siguiente número para mantener la secuencia
             if periodo_vigente.numero_periodo < siguiente_numero:
@@ -232,6 +233,27 @@ class Command(BaseCommand):
         # Crear asignaciones y periodos
         self.stdout.write('Creando asignaciones y periodos...')
         hoy = timezone.now().date()
+
+        def ajustar_fin(periodo, dias_restantes):
+            """Acerca la fecha fin para generar urgencia en periodos vigentes."""
+            if periodo:
+                periodo.fecha_fin_periodo = hoy + timedelta(days=dias_restantes)
+                periodo.save(update_fields=['fecha_fin_periodo'])
+
+        def renumerar_periodos_por_fecha(asignacion):
+            """Asegura que los números de periodo sigan el orden cronológico (más antiguo = número menor)."""
+            periodos = list(asignacion.periodos.order_by('fecha_inicio_periodo'))
+            # Paso 1: mover a números temporales para evitar colisiones del UNIQUE
+            for idx, periodo in enumerate(periodos, start=1):
+                tmp_num = idx + 1000
+                if periodo.numero_periodo != tmp_num:
+                    periodo.numero_periodo = tmp_num
+                    periodo.save(update_fields=['numero_periodo'])
+            # Paso 2: asignar numeración definitiva
+            for idx, periodo in enumerate(periodos, start=1):
+                if periodo.numero_periodo != idx:
+                    periodo.numero_periodo = idx
+                    periodo.save(update_fields=['numero_periodo'])
         
         # Asignación 1: Operario con periodo casi completado (25/29 piezas)
         asignacion1, _ = OperarioCertificacion.objects.get_or_create(
@@ -248,7 +270,9 @@ class Command(BaseCommand):
             # Resetear contador - los signals sumarán las piezas al crear inspecciones
             periodo1.inspecciones_realizadas = 0
             periodo1.save()
+            ajustar_fin(periodo1, 45)  # menos de 2 meses para ver avance
             periodo1 = asegurar_periodos_minimos(asignacion1, periodo1)
+            renumerar_periodos_por_fecha(asignacion1)
             self.stdout.write(f'  ✓ Asignación creada: {asignacion1.operario.nombre_completo} - {asignacion1.certificacion.nombre} (se crearán 25 piezas)')
 
         # Asignación 2: Operario con periodo recién iniciado (5/29 inspecciones)
@@ -265,7 +289,9 @@ class Command(BaseCommand):
         if periodo2:
             periodo2.inspecciones_realizadas = 0
             periodo2.save()
+            ajustar_fin(periodo2, 25)  # ventana corta para urgencia media
             periodo2 = asegurar_periodos_minimos(asignacion2, periodo2)
+            renumerar_periodos_por_fecha(asignacion2)
             self.stdout.write(f'  ✓ Asignación creada: {asignacion2.operario.nombre_completo} - {asignacion2.certificacion.nombre} (se crearán 5 piezas)')
 
         # Asignación 3: Operario con múltiples certificaciones
@@ -282,7 +308,9 @@ class Command(BaseCommand):
         if periodo3a:
             periodo3a.inspecciones_realizadas = 0
             periodo3a.save()
+            ajustar_fin(periodo3a, 60)  # ~2 meses
             periodo3a = asegurar_periodos_minimos(asignacion3a, periodo3a)
+            renumerar_periodos_por_fecha(asignacion3a)
 
         asignacion3b, _ = OperarioCertificacion.objects.get_or_create(
             operario=operarios[2],
@@ -297,7 +325,9 @@ class Command(BaseCommand):
         if periodo3b:
             periodo3b.inspecciones_realizadas = 0
             periodo3b.save()
+            ajustar_fin(periodo3b, 30)  # poco tiempo para terminar
             periodo3b = asegurar_periodos_minimos(asignacion3b, periodo3b)
+            renumerar_periodos_por_fecha(asignacion3b)
         self.stdout.write(f'  ✓ Asignaciones creadas para {operarios[2].nombre_completo} (2 certificaciones, se crearán 15 y 10 piezas)')
 
         # Asignación 4: Operario con periodo CRÍTICO - próximo a vencer
@@ -333,7 +363,9 @@ class Command(BaseCommand):
         )
         periodo5 = asignacion5.periodos.filter(esta_vigente=True).first()
         if periodo5:
+            ajustar_fin(periodo5, 75)  # no demasiado lejos
             periodo5 = asegurar_periodos_minimos(asignacion5, periodo5)
+            renumerar_periodos_por_fecha(asignacion5)
         self.stdout.write(f'  ✓ Asignación creada: {asignacion5.operario.nombre_completo} - {asignacion5.certificacion.nombre} (0 inspecciones)')
         
         # Asignación 6: Operario con periodo CRÍTICO - bajo progreso (mucho tiempo transcurrido, pocas piezas)
@@ -395,8 +427,11 @@ class Command(BaseCommand):
             periodo8 = asegurar_periodos_minimos(asignacion8, periodo8)
             self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion8.operario.nombre_completo} - {asignacion8.certificacion.nombre} (se crearán 20 piezas, apenas 2 días restantes)')
 
-        def crear_inspecciones_para_periodo(asignacion, periodo, piezas_objetivo, prefijo_orden, auditorias_cert, auditores, hoy):
-            """Crea inspecciones distribuidas en un periodo y devuelve (inspecciones, piezas)."""
+        def crear_inspecciones_para_periodo(asignacion, periodo, piezas_objetivo, prefijo_orden, auditorias_cert, auditores, hoy, es_vigente=False):
+            """
+            Crea inspecciones distribuidas en un periodo y devuelve (inspecciones, piezas).
+            Prioriza los últimos 3 meses (y el mes actual) para que la app luzca más viva.
+            """
             if not periodo or piezas_objetivo <= 0:
                 return 0, 0
 
@@ -411,31 +446,33 @@ class Command(BaseCommand):
             piezas_creadas = 0
             num_inspeccion = 0
             fechas_usadas = set()
+            ventana_reciente_inicio = max(fecha_inicio, hoy - timedelta(days=90))
+            inicio_mes_actual = date(hoy.year, hoy.month, 1)
+            piezas_meta = min(piezas_objetivo, 29)  # Nunca superar 29 por periodo
+            max_piezas = 29
 
-            while piezas_creadas < piezas_objetivo:
-                dias_desde_inicio = int((num_inspeccion / max(piezas_objetivo, 1)) * dias_totales) if piezas_objetivo > 0 else 0
-                fecha_inspeccion = fecha_inicio + timedelta(days=dias_desde_inicio)
-
-                while fecha_inspeccion.weekday() >= 5:
-                    fecha_inspeccion += timedelta(days=1)
-
-                if fecha_inspeccion > fecha_fin:
-                    fecha_inspeccion = fecha_fin
-
+            def siguiente_fecha_unica(fecha_base):
+                """Desplaza a día laborable y evita duplicados cercanos."""
+                fecha_candidata = fecha_base
+                while fecha_candidata.weekday() >= 5:
+                    fecha_candidata += timedelta(days=1)
                 intentos = 0
-                while fecha_inspeccion in fechas_usadas and intentos < 10:
-                    fecha_inspeccion += timedelta(days=1)
-                    while fecha_inspeccion.weekday() >= 5:
-                        fecha_inspeccion += timedelta(days=1)
+                while fecha_candidata in fechas_usadas and intentos < 12:
+                    fecha_candidata += timedelta(days=1)
+                    while fecha_candidata.weekday() >= 5:
+                        fecha_candidata += timedelta(days=1)
                     intentos += 1
+                return min(fecha_candidata, fecha_fin)
 
+            def agregar_inspeccion(fecha_objetivo, piezas_sugeridas=None):
+                nonlocal piezas_creadas, num_inspeccion
+                if fecha_objetivo > fecha_fin or piezas_creadas >= max_piezas:
+                    return
+                fecha_inspeccion = siguiente_fecha_unica(fecha_objetivo)
                 fechas_usadas.add(fecha_inspeccion)
-
-                piezas_restantes = piezas_objetivo - piezas_creadas
-                piezas_en_inspeccion = min(random.randint(1, 10), piezas_restantes)
-
+                piezas_restantes = max_piezas - piezas_creadas
+                piezas_en_inspeccion = piezas_sugeridas or min(random.randint(1, 6), piezas_restantes)
                 numero_orden = f"{prefijo_orden}-P{periodo.numero_periodo:02d}-{num_inspeccion+1:03d}-{fecha_inspeccion.strftime('%Y%m%d')}"
-
                 InspeccionProducto.objects.create(
                     operario_certificacion=asignacion,
                     periodo_validacion=periodo,
@@ -443,13 +480,54 @@ class Command(BaseCommand):
                     auditor=random.choice(auditores),
                     fecha_inspeccion=fecha_inspeccion,
                     piezas_auditadas=piezas_en_inspeccion,
-                    resultado_inspeccion=random.choice(['OK', 'NO OK', None]),
+                    resultado_inspeccion=random.choice(['OK', 'NO OK']),
                     numero_orden=numero_orden,
                     observaciones=f'Inspección de ejemplo {num_inspeccion+1} ({piezas_en_inspeccion} piezas)',
                     usuario_creacion=admin_user
                 )
                 piezas_creadas += piezas_en_inspeccion
                 num_inspeccion += 1
+
+            while piezas_creadas < piezas_meta:
+                if random.random() < 0.7:
+                    # Sesgo fuerte a los últimos 90 días
+                    rango_dias = max((fecha_fin - ventana_reciente_inicio).days, 1)
+                    desplazamiento = random.randint(0, rango_dias)
+                    fecha_inspeccion = ventana_reciente_inicio + timedelta(days=desplazamiento)
+                else:
+                    # Distribución más clásica a lo largo del periodo
+                    dias_desde_inicio = int((num_inspeccion / max(piezas_objetivo, 1)) * dias_totales) if piezas_objetivo > 0 else 0
+                    fecha_inspeccion = fecha_inicio + timedelta(days=dias_desde_inicio)
+
+                agregar_inspeccion(fecha_inspeccion)
+
+            # Refuerza presencia reciente (últimos 90 días) con inspecciones adicionales pequeñas
+            fechas_recientes = [f for f in fechas_usadas if f >= ventana_reciente_inicio]
+            objetivo_reciente = max(6, num_inspeccion // 2)
+            while fecha_fin >= ventana_reciente_inicio and len(fechas_recientes) < objetivo_reciente and piezas_creadas < max_piezas:
+                desplazamiento = random.randint(0, max((fecha_fin - ventana_reciente_inicio).days, 1))
+                fecha_extra = ventana_reciente_inicio + timedelta(days=desplazamiento)
+                agregar_inspeccion(fecha_extra, piezas_sugeridas=min(4, max_piezas - piezas_creadas))
+                fechas_recientes = [f for f in fechas_usadas if f >= ventana_reciente_inicio]
+
+            # Garantiza actividad en el mes actual (mínimo dos inspecciones si la ventana lo permite)
+            if fecha_fin >= inicio_mes_actual:
+                fechas_mes = [f for f in fechas_usadas if f >= inicio_mes_actual]
+                while len(fechas_mes) < 2 and piezas_creadas < max_piezas:
+                    desplazamiento = random.randint(0, max((fecha_fin - inicio_mes_actual).days, 0))
+                    fecha_mes = inicio_mes_actual + timedelta(days=desplazamiento)
+                    agregar_inspeccion(fecha_mes, piezas_sugeridas=min(3, max_piezas - piezas_creadas))
+                    fechas_mes = [f for f in fechas_usadas if f >= inicio_mes_actual]
+
+            # Refuerzo específico para periodos vigentes: asegurar actividad muy reciente (últimos 30 días)
+            if es_vigente and fecha_fin >= hoy - timedelta(days=30):
+                fechas_ultimos_30 = [f for f in fechas_usadas if f >= hoy - timedelta(days=30)]
+                objetivo_reciente_vigente = 3
+                while len(fechas_ultimos_30) < objetivo_reciente_vigente and piezas_creadas < max_piezas:
+                    desplazamiento = random.randint(0, max((fecha_fin - max(fecha_inicio, hoy - timedelta(days=30))).days, 0))
+                    fecha_reciente = max(fecha_inicio, hoy - timedelta(days=30)) + timedelta(days=desplazamiento)
+                    agregar_inspeccion(fecha_reciente, piezas_sugeridas=min(3, max_piezas - piezas_creadas))
+                    fechas_ultimos_30 = [f for f in fechas_usadas if f >= hoy - timedelta(days=30)]
 
             if estado_completado_original:
                 periodo.esta_completado = True
@@ -465,18 +543,19 @@ class Command(BaseCommand):
         self.stdout.write('Creando inspecciones de ejemplo (todos los periodos)...')
         asignaciones_con_periodos = [
             (asignacion1, periodo1, 25, 'OP-001'),   # periodo vigente
-            (asignacion2, periodo2, 5, 'OP-002'),
+            (asignacion2, periodo2, 7, 'OP-002'),    # subimos a 7 para asegurar piezas
             (asignacion3a, periodo3a, 15, 'OP-003'),
-            (asignacion3b, periodo3b, 10, 'OP-004'),
+            (asignacion3b, periodo3b, 12, 'OP-004'), # un poco más para que no quede corto
             (asignacion4, periodo4, 15, 'OP-005'),
+            (asignacion5, periodo5, 8, 'OP-006'),    # antes estaba sin inspecciones; ahora vivo
         ]
 
         if 'asignacion6' in locals() and periodo6:
-            asignaciones_con_periodos.append((asignacion6, periodo6, 8, 'OP-006'))
+            asignaciones_con_periodos.append((asignacion6, periodo6, 8, 'OP-007'))
         if 'asignacion7' in locals() and periodo7:
-            asignaciones_con_periodos.append((asignacion7, periodo7, 18, 'OP-007'))
+            asignaciones_con_periodos.append((asignacion7, periodo7, 18, 'OP-008'))
         if 'asignacion8' in locals() and periodo8:
-            asignaciones_con_periodos.append((asignacion8, periodo8, 20, 'OP-008'))
+            asignaciones_con_periodos.append((asignacion8, periodo8, 20, 'OP-009'))
 
         total_inspecciones = 0
         total_piezas = 0
@@ -499,7 +578,8 @@ class Command(BaseCommand):
                     prefijo_orden,
                     auditorias_cert,
                     auditores,
-                    hoy
+                    hoy,
+                    es_vigente=(periodo.id == periodo_vigente.id)
                 )
                 total_inspecciones += inspecciones_creadas
                 total_piezas += piezas_creadas

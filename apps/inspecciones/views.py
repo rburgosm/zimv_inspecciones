@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -6,6 +7,8 @@ from .models import InspeccionProducto, PeriodoValidacionCertificacion
 from .forms import InspeccionProductoForm
 from .signals import verificar_caducidades_pendientes
 from apps.asignaciones.models import OperarioCertificacion
+from apps.certificaciones.models import Certificacion
+from apps.operarios.models import Operario
 
 
 @login_required
@@ -22,34 +25,60 @@ def lista_inspecciones(request):
         'auditor'
     ).all().order_by('-fecha_inspeccion', '-fecha_creacion')
     
-    # Filtros
-    operario_cert_id = request.GET.get('asignacion', '').strip()
-    periodo_id = request.GET.get('periodo', '').strip()
+    # Filtros: operario y certificación (pueden usarse juntos o por separado)
+    operario_id = request.GET.get('operario', '').strip()
+    certificacion_id = request.GET.get('certificacion', '').strip()
     
-    asignacion_filtro = None
-    periodo_filtro = None
+    operario_filtro = None
+    certificacion_filtro = None
     
-    if operario_cert_id:
+    if operario_id:
         try:
-            asignacion_filtro = int(operario_cert_id)
-            inspecciones = inspecciones.filter(operario_certificacion_id=asignacion_filtro)
+            operario_filtro = int(operario_id)
+            inspecciones = inspecciones.filter(operario_certificacion__operario_id=operario_filtro)
         except (ValueError, TypeError):
-            asignacion_filtro = None
+            operario_filtro = None
     
-    if periodo_id:
+    if certificacion_id:
         try:
-            periodo_filtro = int(periodo_id)
-            inspecciones = inspecciones.filter(periodo_validacion_id=periodo_filtro)
+            certificacion_filtro = int(certificacion_id)
+            inspecciones = inspecciones.filter(operario_certificacion__certificacion_id=certificacion_filtro)
         except (ValueError, TypeError):
-            periodo_filtro = None
+            certificacion_filtro = None
     
-    asignaciones = OperarioCertificacion.objects.filter(esta_activa=True).select_related('operario', 'certificacion').order_by('operario__nombre', 'certificacion__nombre')
+    # Listados para los selects
+    operarios_qs = Operario.objects.filter(activo=True).order_by('nombre', 'apellidos')
+    certificaciones_qs = Certificacion.objects.filter(activa=True).order_by('nombre')
+    
+    if operario_filtro:
+        certificaciones_ids = OperarioCertificacion.objects.filter(
+            operario_id=operario_filtro,
+            esta_activa=True
+        ).values_list('certificacion_id', flat=True)
+        certificaciones_qs = certificaciones_qs.filter(id__in=certificaciones_ids)
+    
+    if certificacion_filtro:
+        operarios_ids = OperarioCertificacion.objects.filter(
+            certificacion_id=certificacion_filtro,
+            esta_activa=True
+        ).values_list('operario_id', flat=True)
+        operarios_qs = operarios_qs.filter(id__in=operarios_ids)
+    
+    operarios = list(operarios_qs)
+    certificaciones = list(certificaciones_qs)
     
     return render(request, 'inspecciones/lista.html', {
         'inspecciones': inspecciones,
-        'asignaciones': asignaciones,
-        'asignacion_filtro': asignacion_filtro,
-        'periodo_filtro': periodo_filtro,
+        'operarios': operarios,
+        'certificaciones': certificaciones,
+        'operario_filtro': operario_filtro,
+        'certificacion_filtro': certificacion_filtro,
+        'certificaciones_json': json.dumps([
+            {'id': c.id, 'nombre': c.nombre} for c in Certificacion.objects.filter(activa=True).order_by('nombre')
+        ]),
+        'operarios_json': json.dumps([
+            {'id': o.id, 'nombre': o.nombre_completo} for o in Operario.objects.filter(activo=True).order_by('nombre', 'apellidos')
+        ]),
     })
 
 
@@ -57,6 +86,30 @@ def lista_inspecciones(request):
 @transaction.atomic
 def crear_inspeccion(request):
     """Crear nueva inspección"""
+    asignacion_id = request.GET.get('asignacion')
+    preloaded_instance = None
+    
+    # Pre-cargar datos cuando se llega desde el dashboard
+    if asignacion_id and request.method == 'GET':
+        try:
+            asignacion = OperarioCertificacion.objects.select_related('operario', 'certificacion').get(
+                pk=asignacion_id,
+                esta_activa=True
+            )
+            periodo_vigente = PeriodoValidacionCertificacion.objects.filter(
+                operario_certificacion=asignacion,
+                esta_vigente=True
+            ).first()
+            
+            preloaded_instance = InspeccionProducto(
+                operario_certificacion=asignacion,
+                periodo_validacion=periodo_vigente
+            )
+        except OperarioCertificacion.DoesNotExist:
+            messages.error(request, 'La asignación indicada no está activa o no existe.')
+        except Exception as e:
+            messages.error(request, f'No se pudieron precargar los datos: {str(e)}')
+    
     if request.method == 'POST':
         form = InspeccionProductoForm(request.POST)
         if form.is_valid():
@@ -94,7 +147,7 @@ def crear_inspeccion(request):
                 for error in errors:
                     messages.error(request, f'{field}: {error}')
     else:
-        form = InspeccionProductoForm()
+        form = InspeccionProductoForm(instance=preloaded_instance)
     
     return render(request, 'inspecciones/form.html', {'form': form, 'titulo': 'Crear Inspección'})
 
@@ -142,6 +195,39 @@ def obtener_certificaciones_por_operario(request):
         data = {
             'certificaciones': [
                 {'id': c.id, 'nombre': c.nombre} for c in certificaciones
+            ]
+        }
+        
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def obtener_operarios_por_certificacion(request):
+    """Vista AJAX para obtener operarios según la certificación seleccionada"""
+    from django.http import JsonResponse
+    from apps.asignaciones.models import OperarioCertificacion
+    
+    certificacion_id = request.GET.get('certificacion_id')
+    
+    if not certificacion_id:
+        return JsonResponse({'error': 'ID de certificación requerido'}, status=400)
+    
+    try:
+        operarios_ids = OperarioCertificacion.objects.filter(
+            certificacion_id=certificacion_id,
+            esta_activa=True
+        ).values_list('operario_id', flat=True)
+        
+        operarios = Operario.objects.filter(
+            id__in=operarios_ids,
+            activo=True
+        ).order_by('nombre', 'apellidos')
+        
+        data = {
+            'operarios': [
+                {'id': o.id, 'nombre': o.nombre_completo} for o in operarios
             ]
         }
         

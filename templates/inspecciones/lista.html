@@ -12,24 +12,53 @@
     </div>
 
     <div class="bg-white shadow rounded-lg p-4 mb-6">
-        <form method="get" id="filtro-form" class="flex items-center space-x-4">
-            <label for="asignacion" class="text-sm font-medium text-gray-700">Filtrar por asignación:</label>
-            <select name="asignacion" id="asignacion" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                <option value="">Todas</option>
-                {% for asignacion in asignaciones %}
-                <option value="{{ asignacion.pk }}" {% if asignacion_filtro == asignacion.pk %}selected{% endif %}>
-                    {{ asignacion.operario.nombre_completo }} - {{ asignacion.certificacion.nombre }}
-                </option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                Filtrar
-            </button>
-            {% if asignacion_filtro %}
-            <a href="{% url 'inspecciones:lista' %}" class="text-sm text-blue-600 hover:text-blue-800">
-                Limpiar filtro
-            </a>
-            {% endif %}
+        <form method="get" id="filtro-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+                <label for="operario" class="block text-sm font-medium text-gray-700 mb-1">Operario</label>
+                <select
+                    name="operario"
+                    id="operario"
+                    data-operarios="{{ operarios_json|escapejs }}"
+                    data-selected="{{ operario_filtro|default_if_none:'' }}"
+                    data-api-operarios="{% url 'inspecciones:api_operarios' %}"
+                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                    <option value="">Todos</option>
+                    {% for operario in operarios %}
+                    <option value="{{ operario.pk }}" {% if operario_filtro == operario.pk %}selected{% endif %}>
+                        {{ operario.nombre_completo }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="certificacion" class="block text-sm font-medium text-gray-700 mb-1">Certificación</label>
+                <select
+                    name="certificacion"
+                    id="certificacion"
+                    data-certificaciones="{{ certificaciones_json|escapejs }}"
+                    data-selected="{{ certificacion_filtro|default_if_none:'' }}"
+                    data-api-certificaciones="{% url 'inspecciones:api_certificaciones' %}"
+                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                    <option value="">Todas</option>
+                    {% for certificacion in certificaciones %}
+                    <option value="{{ certificacion.pk }}" {% if certificacion_filtro == certificacion.pk %}selected{% endif %}>
+                        {{ certificacion.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button type="submit" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Filtrar
+                </button>
+                {% if operario_filtro or certificacion_filtro %}
+                <a href="{% url 'inspecciones:lista' %}" class="text-sm text-blue-600 hover:text-blue-800">
+                    Limpiar
+                </a>
+                {% endif %}
+            </div>
         </form>
     </div>
 
@@ -98,16 +127,127 @@
 </div>
 
 <script>
-// Auto-submit al cambiar la selección
 document.addEventListener('DOMContentLoaded', function() {
-    const selectAsignacion = document.getElementById('asignacion');
-    const formFiltro = document.getElementById('filtro-form');
-    
-    if (selectAsignacion && formFiltro) {
-        selectAsignacion.addEventListener('change', function() {
-            formFiltro.submit();
+    const selectOperario = document.getElementById('operario');
+    const selectCertificacion = document.getElementById('certificacion');
+    const apiCertificaciones = selectCertificacion?.dataset.apiCertificaciones;
+    const apiOperarios = selectOperario?.dataset.apiOperarios;
+
+    const parseJsonSafe = (value) => {
+        if (!value) return [];
+        try {
+            return JSON.parse(value);
+        } catch (e) {
+            return [];
+        }
+    };
+
+    const getOptionsFromSelect = (selectEl) => {
+        if (!selectEl) return [];
+        return Array.from(selectEl.options)
+            .filter(opt => opt.value) // omite opción vacía
+            .map(opt => ({ id: opt.value, nombre: opt.textContent }));
+    };
+
+    const certificacionesTodas = (() => {
+        const parsed = parseJsonSafe(selectCertificacion?.dataset.certificaciones);
+        return parsed.length ? parsed : getOptionsFromSelect(selectCertificacion);
+    })();
+
+    const operariosTodos = (() => {
+        const parsed = parseJsonSafe(selectOperario?.dataset.operarios);
+        return parsed.length ? parsed : getOptionsFromSelect(selectOperario);
+    })();
+    const certificacionPreseleccionada = selectCertificacion?.dataset.selected || '';
+    const operarioPreseleccionado = selectOperario?.dataset.selected || '';
+
+    function renderCertificaciones(lista, seleccion = '') {
+        if (!selectCertificacion) return;
+        selectCertificacion.innerHTML = '';
+
+        const opcionTodas = document.createElement('option');
+        opcionTodas.value = '';
+        opcionTodas.textContent = 'Todas';
+        selectCertificacion.appendChild(opcionTodas);
+
+        lista.forEach(cert => {
+            const option = document.createElement('option');
+            option.value = cert.id;
+            option.textContent = cert.nombre;
+            if (String(cert.id) === String(seleccion)) {
+                option.selected = true;
+            }
+            selectCertificacion.appendChild(option);
         });
     }
+
+    function renderOperarios(lista, seleccion = '') {
+        if (!selectOperario) return;
+        selectOperario.innerHTML = '';
+
+        const opcionTodos = document.createElement('option');
+        opcionTodos.value = '';
+        opcionTodos.textContent = 'Todos';
+        selectOperario.appendChild(opcionTodos);
+
+        lista.forEach(op => {
+            const option = document.createElement('option');
+            option.value = op.id;
+            option.textContent = op.nombre;
+            if (String(op.id) === String(seleccion)) {
+                option.selected = true;
+            }
+            selectOperario.appendChild(option);
+        });
+    }
+
+    // Si no hay operario seleccionado, aseguramos el listado completo inicial
+    if (selectOperario && selectCertificacion && !selectOperario.value) {
+        renderCertificaciones(certificacionesTodas, certificacionPreseleccionada);
+    }
+    if (selectCertificacion && selectOperario && !selectCertificacion.value) {
+        renderOperarios(operariosTodos, operarioPreseleccionado);
+    }
+
+    // Al cambiar operario, cargar certificaciones activas de ese operario
+    selectOperario?.addEventListener('change', function() {
+        const operarioId = this.value;
+        const certificacionActual = selectCertificacion?.value || '';
+
+        if (!operarioId) {
+            renderCertificaciones(certificacionesTodas, certificacionActual);
+            return;
+        }
+
+        fetch(`${apiCertificaciones}?operario_id=${operarioId}`)
+            .then(response => response.ok ? response.json() : Promise.reject())
+            .then(data => {
+                renderCertificaciones(data.certificaciones || [], certificacionActual);
+            })
+            .catch(() => {
+                renderCertificaciones([], certificacionActual);
+            });
+    });
+
+    // Al cambiar certificación, cargar operarios con esa certificación
+    selectCertificacion?.addEventListener('change', function() {
+        const certificacionId = this.value;
+        const operarioActual = selectOperario?.value || '';
+
+        if (!certificacionId) {
+            renderOperarios(operariosTodos, operarioActual);
+            return;
+        }
+
+        fetch(`${apiOperarios}?certificacion_id=${certificacionId}`)
+            .then(response => response.ok ? response.json() : Promise.reject())
+            .then(data => {
+                renderOperarios(data.operarios || [], operarioActual);
+            })
+            .catch(() => {
+                renderOperarios([], operarioActual);
+            });
+    });
 });
 </script>
 {% endblock %}

@@ -395,87 +395,48 @@ class Command(BaseCommand):
             periodo8 = asegurar_periodos_minimos(asignacion8, periodo8)
             self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion8.operario.nombre_completo} - {asignacion8.certificacion.nombre} (se crearán 20 piezas, apenas 2 días restantes)')
 
-        # Crear inspecciones de ejemplo
-        # IMPORTANTE: Se cuentan PIEZAS auditadas, no número de inspecciones
-        # El objetivo es alcanzar 29 PIEZAS por periodo, no 29 inspecciones
-        self.stdout.write('Creando inspecciones de ejemplo...')
-        asignaciones_con_periodos = [
-            (asignacion1, periodo1, 25, 'OP-001'),  # 25 piezas
-            (asignacion2, periodo2, 5, 'OP-002'),   # 5 piezas
-            (asignacion3a, periodo3a, 15, 'OP-003'), # 15 piezas
-            (asignacion3b, periodo3b, 10, 'OP-004'), # 10 piezas
-            (asignacion4, periodo4, 15, 'OP-005'),  # 15 piezas (CRÍTICO - poco tiempo)
-        ]
-        
-        # Agregar asignación 6 si existe
-        if 'asignacion6' in locals() and periodo6:
-            asignaciones_con_periodos.append((asignacion6, periodo6, 8, 'OP-006'))  # 8 piezas (CRÍTICO - bajo progreso)
+        def crear_inspecciones_para_periodo(asignacion, periodo, piezas_objetivo, prefijo_orden, auditorias_cert, auditores, hoy):
+            """Crea inspecciones distribuidas en un periodo y devuelve (inspecciones, piezas)."""
+            if not periodo or piezas_objetivo <= 0:
+                return 0, 0
 
-        # Agregar asignaciones nuevas con periodos críticos por tiempo
-        if 'asignacion7' in locals() and periodo7:
-            asignaciones_con_periodos.append((asignacion7, periodo7, 18, 'OP-007'))  # 18 piezas (CRÍTICO - vence en 4 días)
-        if 'asignacion8' in locals() and periodo8:
-            asignaciones_con_periodos.append((asignacion8, periodo8, 20, 'OP-008'))  # 20 piezas (CRÍTICO - vence en 2 días)
-
-        total_inspecciones = 0
-        total_piezas = 0
-        for asignacion, periodo, piezas_objetivo, prefijo_orden in asignaciones_con_periodos:
-            if not periodo:
-                continue
-            
-            # Obtener auditorías de la certificación
-            auditorias_cert = [a for a in auditorias if a.certificacion == asignacion.certificacion]
-            if not auditorias_cert:
-                continue
-
-            # Resetear contador antes de crear inspecciones (los signals sumarán las piezas)
+            estado_completado_original = periodo.esta_completado
             periodo.inspecciones_realizadas = 0
-            periodo.save()
+            periodo.save(update_fields=['inspecciones_realizadas'])
 
-            # Crear inspecciones distribuidas en el periodo
-            # Cada inspección puede tener 1 o más piezas auditadas
-            # El objetivo es alcanzar el total de piezas requerido
             fecha_inicio = periodo.fecha_inicio_periodo
             fecha_fin = min(periodo.fecha_fin_periodo, hoy)
             dias_totales = max((fecha_fin - fecha_inicio).days, 1)
-            
-            # Crear inspecciones hasta alcanzar el objetivo de piezas
+
             piezas_creadas = 0
             num_inspeccion = 0
             fechas_usadas = set()
-            
+
             while piezas_creadas < piezas_objetivo:
-                # Distribuir las fechas a lo largo del periodo
                 dias_desde_inicio = int((num_inspeccion / max(piezas_objetivo, 1)) * dias_totales) if piezas_objetivo > 0 else 0
                 fecha_inspeccion = fecha_inicio + timedelta(days=dias_desde_inicio)
-                
-                # Asegurar que sea día laborable
-                while fecha_inspeccion.weekday() >= 5:  # Sábado o domingo
+
+                while fecha_inspeccion.weekday() >= 5:
                     fecha_inspeccion += timedelta(days=1)
-                
+
                 if fecha_inspeccion > fecha_fin:
                     fecha_inspeccion = fecha_fin
-                
-                # Evitar duplicados de fecha (aunque técnicamente se pueden tener varias el mismo día)
+
                 intentos = 0
                 while fecha_inspeccion in fechas_usadas and intentos < 10:
                     fecha_inspeccion += timedelta(days=1)
                     while fecha_inspeccion.weekday() >= 5:
                         fecha_inspeccion += timedelta(days=1)
                     intentos += 1
-                
+
                 fechas_usadas.add(fecha_inspeccion)
-                
-                # Calcular cuántas piezas crear en esta inspección
-                # Puede ser 1 o más, pero no exceder el objetivo total
+
                 piezas_restantes = piezas_objetivo - piezas_creadas
-                piezas_en_inspeccion = min(random.randint(1, 10), piezas_restantes)  # Entre 1 y 10 piezas por inspección
-                
-                # Generar número de orden único
-                numero_orden = f"{prefijo_orden}-{num_inspeccion+1:03d}-{fecha_inspeccion.strftime('%Y%m%d')}"
-                
-                # Crear inspección (el signal sumará las piezas al contador automáticamente)
-                inspeccion = InspeccionProducto.objects.create(
+                piezas_en_inspeccion = min(random.randint(1, 10), piezas_restantes)
+
+                numero_orden = f"{prefijo_orden}-P{periodo.numero_periodo:02d}-{num_inspeccion+1:03d}-{fecha_inspeccion.strftime('%Y%m%d')}"
+
+                InspeccionProducto.objects.create(
                     operario_certificacion=asignacion,
                     periodo_validacion=periodo,
                     auditoria_producto=random.choice(auditorias_cert),
@@ -487,15 +448,63 @@ class Command(BaseCommand):
                     observaciones=f'Inspección de ejemplo {num_inspeccion+1} ({piezas_en_inspeccion} piezas)',
                     usuario_creacion=admin_user
                 )
-                total_inspecciones += 1
                 piezas_creadas += piezas_en_inspeccion
                 num_inspeccion += 1
-                
-                # Si ya alcanzamos el objetivo, salir
-                if piezas_creadas >= piezas_objetivo:
-                    break
 
-        self.stdout.write(f'  ✓ {total_inspecciones} inspecciones creadas (totalizando las piezas requeridas por periodo)')
+            if estado_completado_original:
+                periodo.esta_completado = True
+                if not periodo.fecha_completado:
+                    periodo.fecha_completado = fecha_fin
+                periodo.save(update_fields=['esta_completado', 'fecha_completado'])
+
+            return num_inspeccion, piezas_creadas
+
+        # Crear inspecciones de ejemplo
+        # IMPORTANTE: Se cuentan PIEZAS auditadas, no número de inspecciones
+        # El objetivo es alcanzar 29 PIEZAS por periodo, no 29 inspecciones
+        self.stdout.write('Creando inspecciones de ejemplo (todos los periodos)...')
+        asignaciones_con_periodos = [
+            (asignacion1, periodo1, 25, 'OP-001'),   # periodo vigente
+            (asignacion2, periodo2, 5, 'OP-002'),
+            (asignacion3a, periodo3a, 15, 'OP-003'),
+            (asignacion3b, periodo3b, 10, 'OP-004'),
+            (asignacion4, periodo4, 15, 'OP-005'),
+        ]
+
+        if 'asignacion6' in locals() and periodo6:
+            asignaciones_con_periodos.append((asignacion6, periodo6, 8, 'OP-006'))
+        if 'asignacion7' in locals() and periodo7:
+            asignaciones_con_periodos.append((asignacion7, periodo7, 18, 'OP-007'))
+        if 'asignacion8' in locals() and periodo8:
+            asignaciones_con_periodos.append((asignacion8, periodo8, 20, 'OP-008'))
+
+        total_inspecciones = 0
+        total_piezas = 0
+
+        for asignacion, periodo_vigente, piezas_objetivo_vigente, prefijo_orden in asignaciones_con_periodos:
+            if not periodo_vigente:
+                continue
+
+            auditorias_cert = [a for a in auditorias if a.certificacion == asignacion.certificacion]
+            if not auditorias_cert:
+                continue
+
+            # Generar inspecciones para todos los periodos de la asignación
+            for periodo in asignacion.periodos.order_by('numero_periodo'):
+                objetivo_periodo = piezas_objetivo_vigente if periodo.id == periodo_vigente.id else (periodo.inspecciones_requeridas or piezas_objetivo_vigente)
+                inspecciones_creadas, piezas_creadas = crear_inspecciones_para_periodo(
+                    asignacion,
+                    periodo,
+                    objetivo_periodo,
+                    prefijo_orden,
+                    auditorias_cert,
+                    auditores,
+                    hoy
+                )
+                total_inspecciones += inspecciones_creadas
+                total_piezas += piezas_creadas
+
+        self.stdout.write(f'  ✓ {total_inspecciones} inspecciones creadas (cubriendo historiales y vigentes)')
 
         # Resumen
         self.stdout.write(self.style.SUCCESS('\n=== Resumen de datos creados ==='))

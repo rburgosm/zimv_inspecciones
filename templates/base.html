@@ -5,6 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Inspecciones Zimvie{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Solución para dropdowns en móvil - evita que se posicionen mal */
+        @media (max-width: 768px) {
+            /* Asegurar que body y html no bloqueen los dropdowns */
+            html, body {
+                overflow-x: hidden;
+                overflow-y: auto;
+            }
+            
+            /* Los selects deben poder posicionarse correctamente */
+            select {
+                position: relative;
+                z-index: 10;
+                width: 100%;
+                -webkit-appearance: menulist;
+                -moz-appearance: menulist;
+                appearance: menulist;
+            }
+            
+            /* Los formularios y sus contenedores no deben tener overflow que afecte los dropdowns */
+            form,
+            .max-w-2xl,
+            .max-w-4xl,
+            .max-w-6xl,
+            .max-w-7xl,
+            main {
+                position: relative;
+                overflow: visible !important;
+            }
+            
+            /* Contenedor de formularios debe permitir que los dropdowns se muestren */
+            .bg-white.shadow.rounded-lg,
+            .bg-white.shadow,
+            .bg-white {
+                position: relative;
+                overflow: visible !important;
+            }
+            
+            /* Asegurar que los contenedores de campos no tengan overflow */
+            .space-y-6 > div,
+            form > div,
+            .space-y-6 {
+                position: relative;
+                overflow: visible !important;
+            }
+            
+            /* Cuando un select está enfocado o activo */
+            select:focus,
+            select:active {
+                position: relative;
+                z-index: 9999;
+                outline: 2px solid #3b82f6;
+                outline-offset: 2px;
+            }
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
     <nav class="bg-blue-600 text-white shadow-lg">
@@ -13,12 +69,13 @@
                 <div class="flex items-center">
                     <a href="{% url 'home' %}" class="text-xl font-bold">Inspecciones Zimvie</a>
                 </div>
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 sm:space-x-4">
                     {% if user.is_authenticated %}
-                        <span class="text-sm">Usuario: {{ user.username }}</span>
-                        <a href="{% url 'usuarios:logout' %}" class="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded transition">Cerrar Sesión</a>
+                        <span class="hidden sm:inline text-sm">Usuario: {{ user.username }}</span>
+                        <span class="sm:hidden text-sm">{{ user.username|truncatechars:10 }}</span>
+                        <a href="{% url 'usuarios:logout' %}" class="bg-blue-700 hover:bg-blue-800 px-3 sm:px-4 py-2 rounded transition text-sm">Cerrar Sesión</a>
                     {% else %}
-                        <a href="{% url 'usuarios:login' %}" class="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded transition">Iniciar Sesión</a>
+                        <a href="{% url 'usuarios:login' %}" class="bg-blue-700 hover:bg-blue-800 px-3 sm:px-4 py-2 rounded transition text-sm">Iniciar Sesión</a>
                     {% endif %}
                 </div>
             </div>
@@ -28,7 +85,31 @@
     {% if user.is_authenticated %}
     <div class="bg-white shadow">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex space-x-8">
+            <!-- Botón hamburguesa para móvil -->
+            <div class="md:hidden flex justify-end">
+                <button type="button" id="menu-toggle" class="flex items-center py-4 text-gray-700 hover:text-blue-600 focus:outline-none focus:text-blue-600" aria-expanded="false" aria-controls="mobile-menu">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path id="menu-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        <path id="close-icon" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span class="ml-2 text-sm font-medium">Menú</span>
+                </button>
+            </div>
+            
+            <!-- Menú móvil (oculto por defecto) -->
+            <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200">
+                <div class="flex flex-col space-y-1 py-2">
+                    <a href="{% url 'operarios:lista' %}" class="border-l-4 border-transparent hover:border-blue-600 hover:bg-gray-50 py-3 px-4 text-sm font-medium text-gray-700 hover:text-blue-600">Operarios</a>
+                    <a href="{% url 'certificaciones:lista' %}" class="border-l-4 border-transparent hover:border-blue-600 hover:bg-gray-50 py-3 px-4 text-sm font-medium text-gray-700 hover:text-blue-600">Certificaciones</a>
+                    <a href="{% url 'auditores:lista' %}" class="border-l-4 border-transparent hover:border-blue-600 hover:bg-gray-50 py-3 px-4 text-sm font-medium text-gray-700 hover:text-blue-600">Auditores</a>
+                    <a href="{% url 'auditorias:lista' %}" class="border-l-4 border-transparent hover:border-blue-600 hover:bg-gray-50 py-3 px-4 text-sm font-medium text-gray-700 hover:text-blue-600">Auditorías</a>
+                    <a href="{% url 'asignaciones:lista' %}" class="border-l-4 border-transparent hover:border-blue-600 hover:bg-gray-50 py-3 px-4 text-sm font-medium text-gray-700 hover:text-blue-600">Asignaciones</a>
+                    <a href="{% url 'inspecciones:lista' %}" class="border-l-4 border-transparent hover:border-blue-600 hover:bg-gray-50 py-3 px-4 text-sm font-medium text-gray-700 hover:text-blue-600">Inspecciones</a>
+                </div>
+            </div>
+            
+            <!-- Menú desktop (visible solo en pantallas medianas y grandes) -->
+            <div class="hidden md:flex space-x-8">
                 <a href="{% url 'operarios:lista' %}" class="border-b-2 border-transparent hover:border-blue-600 py-4 px-1 text-sm font-medium text-gray-700 hover:text-blue-600">Operarios</a>
                 <a href="{% url 'certificaciones:lista' %}" class="border-b-2 border-transparent hover:border-blue-600 py-4 px-1 text-sm font-medium text-gray-700 hover:text-blue-600">Certificaciones</a>
                 <a href="{% url 'auditores:lista' %}" class="border-b-2 border-transparent hover:border-blue-600 py-4 px-1 text-sm font-medium text-gray-700 hover:text-blue-600">Auditores</a>
@@ -40,7 +121,7 @@
     </div>
     {% endif %}
 
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {% if messages %}
             <div class="mb-4">
                 {% for message in messages %}
@@ -60,5 +141,48 @@
             <p>&copy; 2024 Inspecciones Zimvie. Todos los derechos reservados.</p>
         </div>
     </footer>
+
+    <script>
+        // Manejo del menú hamburguesa
+        document.addEventListener('DOMContentLoaded', function() {
+            const menuToggle = document.getElementById('menu-toggle');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const menuIcon = document.getElementById('menu-icon');
+            const closeIcon = document.getElementById('close-icon');
+            
+            if (menuToggle && mobileMenu) {
+                menuToggle.addEventListener('click', function() {
+                    const isHidden = mobileMenu.classList.contains('hidden');
+                    
+                    if (isHidden) {
+                        mobileMenu.classList.remove('hidden');
+                        menuIcon.classList.add('hidden');
+                        closeIcon.classList.remove('hidden');
+                        menuToggle.setAttribute('aria-expanded', 'true');
+                    } else {
+                        mobileMenu.classList.add('hidden');
+                        menuIcon.classList.remove('hidden');
+                        closeIcon.classList.add('hidden');
+                        menuToggle.setAttribute('aria-expanded', 'false');
+                    }
+                });
+            }
+            
+            // Solución para dropdowns en móvil - asegurar posicionamiento correcto
+            if (window.innerWidth <= 768) {
+                const selects = document.querySelectorAll('select');
+                selects.forEach(select => {
+                    // Asegurar que el select tenga un contenedor con posición relativa
+                    if (select.offsetParent && select.offsetParent !== document.body) {
+                        const container = select.closest('.space-y-6, form, .bg-white');
+                        if (container) {
+                            container.style.position = 'relative';
+                            container.style.overflow = 'visible';
+                        }
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>

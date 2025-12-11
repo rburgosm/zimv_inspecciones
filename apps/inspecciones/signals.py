@@ -27,7 +27,9 @@ def actualizar_periodo_y_crear_siguiente(sender, instance, created, **kwargs):
             piezas_requeridas = config.inspecciones_minimas if config else 29
             
             # Si se alcanza el número requerido de piezas (29)
-            if periodo.inspecciones_realizadas >= piezas_requeridas:
+            # Solo crear nuevo periodo cuando el actual está vigente (evita disparar
+            # periodos adicionales al poblar históricos no vigentes en datos de demo)
+            if periodo.esta_vigente and periodo.inspecciones_realizadas >= piezas_requeridas:
                 # Marcar periodo como completado
                 periodo.esta_completado = True
                 periodo.esta_vigente = False

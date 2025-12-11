@@ -145,6 +145,7 @@ function cargarCertificaciones(operarioId) {
     const selectCertificacion = document.getElementById('id_certificacion');
     const selectAuditoria = document.getElementById('id_auditoria_producto');
     const periodoInfo = document.getElementById('periodo-info');
+    const preselectedCert = selectCertificacion.dataset.selected;
     
     if (!operarioId) {
         selectCertificacion.innerHTML = '<option value="">---------</option>';
@@ -161,6 +162,9 @@ function cargarCertificaciones(operarioId) {
                 const option = document.createElement('option');
                 option.value = certificacion.id;
                 option.textContent = certificacion.nombre;
+                if (preselectedCert && preselectedCert === option.value) {
+                    option.selected = true;
+                }
                 selectCertificacion.appendChild(option);
             });
             
@@ -223,6 +227,7 @@ function cargarAuditoriasYPeriodo(operarioId, certificacionId) {
 document.addEventListener('DOMContentLoaded', function() {
     const selectOperario = document.getElementById('id_operario');
     const selectCertificacion = document.getElementById('id_certificacion');
+    const preselectedCert = selectCertificacion.dataset.selected;
     
     // Cargar certificaciones al cambiar el operario
     selectOperario.addEventListener('change', function() {
@@ -238,11 +243,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Si hay valores iniciales, cargar datos
     if (selectOperario.value) {
-        cargarCertificaciones(selectOperario.value);
+        // Solo recargar certificaciones si aún no hay opciones cargadas (más allá del placeholder)
+        if (selectCertificacion.options.length <= 1) {
+            cargarCertificaciones(selectOperario.value);
+        }
         if (selectCertificacion.value) {
             setTimeout(() => {
                 cargarAuditoriasYPeriodo(selectOperario.value, selectCertificacion.value);
             }, 100);
+        } else if (preselectedCert) {
+            // Si hay certificación preseleccionada pero no cargada aún, recargar y seleccionar
+            cargarCertificaciones(selectOperario.value);
+            setTimeout(() => {
+                selectCertificacion.value = preselectedCert;
+                cargarAuditoriasYPeriodo(selectOperario.value, preselectedCert);
+            }, 150);
         }
     }
 });

@@ -100,14 +100,15 @@
             </div>
         </div>
 
-        <!-- Tabla de Periodos Críticos -->
+
+        <!-- Tabla de Certificaciones Vigentes -->
         <div class="bg-white shadow rounded-lg mb-6">
             <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-xl font-bold text-gray-900">Periodos Críticos</h2>
-                <p class="text-sm text-gray-500 mt-1">Periodos que requieren atención inmediata</p>
+                <h2 class="text-xl font-bold text-gray-900">Todas las certificaciones vigentes</h2>
+                <p class="text-sm text-gray-500 mt-1">Visión general de todos los periodos activos</p>
             </div>
             
-            {% if periodos_criticos %}
+            {% if periodos_vigentes %}
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
@@ -122,8 +123,8 @@
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        {% for item in periodos_criticos %}
-                        <tr class="{% if item.nivel_criticidad == 'critico' %}bg-red-50{% elif item.nivel_criticidad == 'alto' %}bg-orange-50{% else %}bg-yellow-50{% endif %}">
+                        {% for item in periodos_vigentes %}
+                        <tr class="{% if item.nivel_criticidad == 'critico' %}bg-red-50{% elif item.nivel_criticidad == 'alto' %}bg-orange-50{% elif item.nivel_criticidad == 'medio' %}bg-yellow-50{% else %}bg-white{% endif %}">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {{ item.periodo.operario_certificacion.operario.nombre_completo }}
                             </td>
@@ -164,16 +165,20 @@
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
                                     Alto
                                 </span>
-                                {% else %}
+                                {% elif item.nivel_criticidad == 'medio' %}
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                                     Medio
+                                </span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    Normal
                                 </span>
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                <a href="{% url 'asignaciones:detalle' item.periodo.operario_certificacion.pk %}" 
-                                   class="text-blue-600 hover:text-blue-800">
-                                    Ver detalle
+                                <a href="{% url 'inspecciones:crear' %}?asignacion={{ item.periodo.operario_certificacion.pk }}"
+                                   class="text-blue-600 hover:text-blue-800 font-semibold">
+                                    Añadir inspección
                                 </a>
                             </td>
                         </tr>
@@ -186,8 +191,8 @@
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900">No hay periodos críticos</h3>
-                <p class="mt-1 text-sm text-gray-500">Todos los periodos están en buen estado.</p>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No hay certificaciones vigentes</h3>
+                <p class="mt-1 text-sm text-gray-500">Aún no existen periodos activos.</p>
             </div>
             {% endif %}
         </div>

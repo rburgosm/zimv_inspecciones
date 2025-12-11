@@ -45,8 +45,8 @@ def home_view(request):
     hoy = timezone.now().date()
     fecha_limite = hoy + timedelta(days=30)  # Próximos 30 días
     
-    # Obtener periodos críticos
-    periodos_criticos = PeriodoValidacionCertificacion.objects.filter(
+    # Obtener todos los periodos vigentes para calcular métricas y criticidad
+    periodos_vigentes_qs = PeriodoValidacionCertificacion.objects.filter(
         esta_vigente=True,
         esta_completado=False
     ).select_related(
@@ -54,11 +54,11 @@ def home_view(request):
         'operario_certificacion__certificacion'
     ).order_by('fecha_fin_periodo')
     
-    # Filtrar periodos críticos:
-    # 1. Periodos que vencen en los próximos 30 días
-    # 2. Periodos con menos del 50% de piezas y más de la mitad del tiempo transcurrido
+    periodos_vigentes_lista = []
     periodos_criticos_lista = []
-    for periodo in periodos_criticos:
+    
+    # Calcular criticidad y métricas por periodo
+    for periodo in periodos_vigentes_qs:
         dias_restantes = (periodo.fecha_fin_periodo - hoy).days
         dias_transcurridos = (hoy - periodo.fecha_inicio_periodo).days
         dias_totales = (periodo.fecha_fin_periodo - periodo.fecha_inicio_periodo).days
@@ -114,15 +114,18 @@ def home_view(request):
             else:
                 nivel_criticidad = 'medio' if nivel_criticidad == 'normal' else nivel_criticidad
         
+        periodo_data = {
+            'periodo': periodo,
+            'dias_restantes': dias_restantes,
+            'porcentaje_piezas': round(porcentaje_piezas, 1),
+            'porcentaje_tiempo': round(porcentaje_tiempo, 1),
+            'nivel_criticidad': nivel_criticidad,
+            'piezas_faltantes': periodo.inspecciones_requeridas - periodo.inspecciones_realizadas
+        }
+        periodos_vigentes_lista.append(periodo_data)
+        
         if es_critico:
-            periodos_criticos_lista.append({
-                'periodo': periodo,
-                'dias_restantes': dias_restantes,
-                'porcentaje_piezas': round(porcentaje_piezas, 1),
-                'porcentaje_tiempo': round(porcentaje_tiempo, 1),
-                'nivel_criticidad': nivel_criticidad,
-                'piezas_faltantes': periodo.inspecciones_requeridas - periodo.inspecciones_realizadas
-            })
+            periodos_criticos_lista.append(periodo_data)
     
     # Ordenar por nivel de criticidad y días restantes
     periodos_criticos_lista.sort(key=lambda x: (
@@ -152,5 +155,6 @@ def home_view(request):
     
     return render(request, 'home.html', {
         'periodos_criticos': periodos_criticos_lista[:10],  # Mostrar solo los 10 más críticos
+        'periodos_vigentes': periodos_vigentes_lista,
         'stats': stats
     })

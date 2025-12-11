@@ -81,12 +81,61 @@ class Command(BaseCommand):
             config.save()
             self.stdout.write(self.style.SUCCESS('  ✓ Configuración verificada.'))
 
+        def asegurar_periodos_minimos(asignacion, periodo_vigente, periodos_minimos=4):
+            """Garantiza al menos N periodos por asignación, con historial completado."""
+            if not periodo_vigente or not asignacion:
+                return periodo_vigente
+
+            periodos_actuales = asignacion.periodos.order_by('numero_periodo')
+            total_actual = periodos_actuales.count()
+            if total_actual >= periodos_minimos:
+                return periodo_vigente
+
+            dias_laborales = config.numero_dias_laborales_req if config else 180
+            piezas_requeridas = config.inspecciones_minimas if config else 29
+
+            ultimo_numero = periodos_actuales.last().numero_periodo if total_actual else 0
+            siguiente_numero = ultimo_numero + 1
+
+            # Retroceder en el tiempo para crear historiales previos sin solapar al vigente
+            fecha_cursor = periodo_vigente.fecha_inicio_periodo - timedelta(days=dias_laborales + 5)
+
+            for _ in range(periodos_minimos - total_actual):
+                fecha_fin_cursor = fecha_cursor + timedelta(days=dias_laborales)
+                PeriodoValidacionCertificacion.objects.get_or_create(
+                    operario_certificacion=asignacion,
+                    numero_periodo=siguiente_numero,
+                    defaults={
+                        'fecha_inicio_periodo': fecha_cursor,
+                        'fecha_fin_periodo': fecha_fin_cursor,
+                        'numero_dias_laborales_req': dias_laborales,
+                        'inspecciones_requeridas': piezas_requeridas,
+                        'inspecciones_realizadas': piezas_requeridas,
+                        'esta_completado': True,
+                        'esta_vigente': False,
+                        'fecha_completado': fecha_fin_cursor,
+                        'usuario_creacion': admin_user,
+                    }
+                )
+                siguiente_numero += 1
+                # Dejar un pequeño hueco entre periodos históricos
+                fecha_cursor -= timedelta(days=dias_laborales + 5)
+
+            # Asegurar que el vigente quede con el siguiente número para mantener la secuencia
+            if periodo_vigente.numero_periodo < siguiente_numero:
+                periodo_vigente.numero_periodo = siguiente_numero
+                periodo_vigente.save(update_fields=['numero_periodo'])
+
+            return periodo_vigente
+
         # Crear certificaciones
         self.stdout.write('Creando certificaciones...')
         certificaciones_data = [
             {'nombre': 'Certificación de Laboratorio', 'descripcion': 'Certificación para trabajo en laboratorio dental'},
             {'nombre': 'Certificación de Taller', 'descripcion': 'Certificación para trabajo en taller de prótesis'},
             {'nombre': 'Certificación de Calidad', 'descripcion': 'Certificación de control de calidad'},
+            {'nombre': 'Certificación de Implantología', 'descripcion': 'Protocolos críticos de implantología'},
+            {'nombre': 'Certificación Exprés', 'descripcion': 'Procesos urgentes con ventanas muy cortas'},
         ]
         certificaciones = []
         for cert_data in certificaciones_data:
@@ -112,6 +161,9 @@ class Command(BaseCommand):
             {'certificacion': certificaciones[1], 'nombre': 'Prótesis Removibles', 'descripcion': 'Inspección de prótesis removibles'},
             {'certificacion': certificaciones[2], 'nombre': 'Control Dimensional', 'descripcion': 'Control de dimensiones'},
             {'certificacion': certificaciones[2], 'nombre': 'Control de Materiales', 'descripcion': 'Control de calidad de materiales'},
+            {'certificacion': certificaciones[3], 'nombre': 'Implantes Unitarios', 'descripcion': 'Evaluación de implantes unitarios'},
+            {'certificacion': certificaciones[3], 'nombre': 'Implantes Múltiples', 'descripcion': 'Evaluación de implantes múltiples'},
+            {'certificacion': certificaciones[4], 'nombre': 'Urgencia Exprés', 'descripcion': 'Inspecciones rápidas en menos de 72h'},
         ]
         auditorias = []
         for aud_data in auditorias_data:
@@ -159,6 +211,8 @@ class Command(BaseCommand):
             {'nombre': 'Miguel', 'apellidos': 'Díaz Moreno', 'codigo': 'OP003'},
             {'nombre': 'Carmen', 'apellidos': 'Vázquez Romero', 'codigo': 'OP004'},
             {'nombre': 'David', 'apellidos': 'Herrera Navarro', 'codigo': 'OP005'},
+            {'nombre': 'Silvia', 'apellidos': 'Ramos Cortés', 'codigo': 'OP006'},
+            {'nombre': 'Andrés', 'apellidos': 'Luna Prieto', 'codigo': 'OP007'},
         ]
         operarios = []
         for op_data in operarios_data:
@@ -194,6 +248,7 @@ class Command(BaseCommand):
             # Resetear contador - los signals sumarán las piezas al crear inspecciones
             periodo1.inspecciones_realizadas = 0
             periodo1.save()
+            periodo1 = asegurar_periodos_minimos(asignacion1, periodo1)
             self.stdout.write(f'  ✓ Asignación creada: {asignacion1.operario.nombre_completo} - {asignacion1.certificacion.nombre} (se crearán 25 piezas)')
 
         # Asignación 2: Operario con periodo recién iniciado (5/29 inspecciones)
@@ -210,6 +265,7 @@ class Command(BaseCommand):
         if periodo2:
             periodo2.inspecciones_realizadas = 0
             periodo2.save()
+            periodo2 = asegurar_periodos_minimos(asignacion2, periodo2)
             self.stdout.write(f'  ✓ Asignación creada: {asignacion2.operario.nombre_completo} - {asignacion2.certificacion.nombre} (se crearán 5 piezas)')
 
         # Asignación 3: Operario con múltiples certificaciones
@@ -226,6 +282,7 @@ class Command(BaseCommand):
         if periodo3a:
             periodo3a.inspecciones_realizadas = 0
             periodo3a.save()
+            periodo3a = asegurar_periodos_minimos(asignacion3a, periodo3a)
 
         asignacion3b, _ = OperarioCertificacion.objects.get_or_create(
             operario=operarios[2],
@@ -240,6 +297,7 @@ class Command(BaseCommand):
         if periodo3b:
             periodo3b.inspecciones_realizadas = 0
             periodo3b.save()
+            periodo3b = asegurar_periodos_minimos(asignacion3b, periodo3b)
         self.stdout.write(f'  ✓ Asignaciones creadas para {operarios[2].nombre_completo} (2 certificaciones, se crearán 15 y 10 piezas)')
 
         # Asignación 4: Operario con periodo CRÍTICO - próximo a vencer
@@ -260,6 +318,7 @@ class Command(BaseCommand):
             periodo4.fecha_fin_periodo = hoy + timedelta(days=5)
             periodo4.inspecciones_realizadas = 0
             periodo4.save()
+            periodo4 = asegurar_periodos_minimos(asignacion4, periodo4)
             self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion4.operario.nombre_completo} - {asignacion4.certificacion.nombre} (se crearán 15 piezas, CRÍTICO - vence en 5 días)')
 
         # Asignación 5: Operario nuevo sin inspecciones
@@ -272,6 +331,9 @@ class Command(BaseCommand):
                 'usuario_creacion': admin_user
             }
         )
+        periodo5 = asignacion5.periodos.filter(esta_vigente=True).first()
+        if periodo5:
+            periodo5 = asegurar_periodos_minimos(asignacion5, periodo5)
         self.stdout.write(f'  ✓ Asignación creada: {asignacion5.operario.nombre_completo} - {asignacion5.certificacion.nombre} (0 inspecciones)')
         
         # Asignación 6: Operario con periodo CRÍTICO - bajo progreso (mucho tiempo transcurrido, pocas piezas)
@@ -292,7 +354,46 @@ class Command(BaseCommand):
             periodo6.fecha_fin_periodo = hoy + timedelta(days=60)
             periodo6.inspecciones_realizadas = 0
             periodo6.save()
+            periodo6 = asegurar_periodos_minimos(asignacion6, periodo6)
             self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion6.operario.nombre_completo} - {asignacion6.certificacion.nombre} (se crearán 8 piezas, CRÍTICO - bajo progreso: 66% tiempo, solo 27% piezas)')
+
+        # Asignación 7: Operario con certificación de implantología, ventana mínima restante
+        fecha_asignacion7 = hoy - timedelta(days=165)
+        asignacion7, _ = OperarioCertificacion.objects.get_or_create(
+            operario=operarios[5],
+            certificacion=certificaciones[3],
+            fecha_asignacion=fecha_asignacion7,
+            defaults={
+                'esta_activa': True,
+                'usuario_creacion': admin_user
+            }
+        )
+        periodo7 = asignacion7.periodos.filter(esta_vigente=True).first()
+        if periodo7:
+            periodo7.fecha_fin_periodo = hoy + timedelta(days=4)
+            periodo7.inspecciones_realizadas = 0
+            periodo7.save()
+            periodo7 = asegurar_periodos_minimos(asignacion7, periodo7)
+            self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion7.operario.nombre_completo} - {asignacion7.certificacion.nombre} (se crearán 18 piezas, vence en 4 días)')
+
+        # Asignación 8: Certificación exprés con casi todo el tiempo consumido
+        fecha_asignacion8 = hoy - timedelta(days=178)
+        asignacion8, _ = OperarioCertificacion.objects.get_or_create(
+            operario=operarios[6],
+            certificacion=certificaciones[4],
+            fecha_asignacion=fecha_asignacion8,
+            defaults={
+                'esta_activa': True,
+                'usuario_creacion': admin_user
+            }
+        )
+        periodo8 = asignacion8.periodos.filter(esta_vigente=True).first()
+        if periodo8:
+            periodo8.fecha_fin_periodo = hoy + timedelta(days=2)
+            periodo8.inspecciones_realizadas = 0
+            periodo8.save()
+            periodo8 = asegurar_periodos_minimos(asignacion8, periodo8)
+            self.stdout.write(f'  ✓ Asignación CRÍTICA creada: {asignacion8.operario.nombre_completo} - {asignacion8.certificacion.nombre} (se crearán 20 piezas, apenas 2 días restantes)')
 
         # Crear inspecciones de ejemplo
         # IMPORTANTE: Se cuentan PIEZAS auditadas, no número de inspecciones
@@ -309,6 +410,12 @@ class Command(BaseCommand):
         # Agregar asignación 6 si existe
         if 'asignacion6' in locals() and periodo6:
             asignaciones_con_periodos.append((asignacion6, periodo6, 8, 'OP-006'))  # 8 piezas (CRÍTICO - bajo progreso)
+
+        # Agregar asignaciones nuevas con periodos críticos por tiempo
+        if 'asignacion7' in locals() and periodo7:
+            asignaciones_con_periodos.append((asignacion7, periodo7, 18, 'OP-007'))  # 18 piezas (CRÍTICO - vence en 4 días)
+        if 'asignacion8' in locals() and periodo8:
+            asignaciones_con_periodos.append((asignacion8, periodo8, 20, 'OP-008'))  # 20 piezas (CRÍTICO - vence en 2 días)
 
         total_inspecciones = 0
         total_piezas = 0

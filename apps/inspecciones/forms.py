@@ -72,20 +72,30 @@ class InspeccionProductoForm(forms.ModelForm):
         # Configurar queryset de operarios
         self.fields['operario'].queryset = Operario.objects.filter(activo=True).order_by('nombre', 'apellidos')
         
-        # Si hay una instancia existente, establecer valores iniciales
-        if self.instance and self.instance.pk:
-            if self.instance.operario_certificacion:
-                self.fields['operario'].initial = self.instance.operario_certificacion.operario
-                # Filtrar certificaciones del operario
-                certificaciones_ids = OperarioCertificacion.objects.filter(
-                    operario=self.instance.operario_certificacion.operario,
-                    esta_activa=True
-                ).values_list('certificacion_id', flat=True)
-                self.fields['certificacion'].queryset = Certificacion.objects.filter(
-                    id__in=certificaciones_ids,
-                    activa=True
-                ).order_by('nombre')
-                self.fields['certificacion'].initial = self.instance.operario_certificacion.certificacion
+        # Si hay instancia (nueva o existente) con asignación, establecer valores iniciales
+        if self.instance and getattr(self.instance, 'operario_certificacion', None):
+            operario_asignado = self.instance.operario_certificacion.operario
+            certificacion_asignada = self.instance.operario_certificacion.certificacion
+            
+            self.fields['operario'].initial = operario_asignado
+            
+            certificaciones_ids = OperarioCertificacion.objects.filter(
+                operario=operario_asignado,
+                esta_activa=True
+            ).values_list('certificacion_id', flat=True)
+            self.fields['certificacion'].queryset = Certificacion.objects.filter(
+                id__in=certificaciones_ids,
+                activa=True
+            ).order_by('nombre')
+            self.fields['certificacion'].initial = certificacion_asignada
+            # Marcar certificación preseleccionada para el JS
+            self.fields['certificacion'].widget.attrs['data-selected'] = str(certificacion_asignada.id)
+            
+            # Cargar auditorías disponibles de la certificación seleccionada
+            self.fields['auditoria_producto'].queryset = AuditoriaProducto.objects.filter(
+                certificacion=certificacion_asignada,
+                activa=True
+            ).order_by('nombre')
         
         # Si hay datos POST, filtrar certificaciones según el operario seleccionado
         if self.data and 'operario' in self.data:

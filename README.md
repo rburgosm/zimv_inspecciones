@@ -43,6 +43,22 @@ python manage.py shell
 ... )
 ```
 
+O usar el comando de datos de demostración (recomendado para desarrollo):
+```bash
+python manage.py crear_demo_data
+```
+Este comando crea automáticamente:
+- Usuario admin (username: `admin`, password: `admin123`)
+- Configuración del sistema
+- Operarios, certificaciones, auditores y auditorías de ejemplo
+- Asignaciones con periodos de validación
+- Inspecciones distribuidas en diferentes escenarios
+
+**Nota**: Por defecto, el comando elimina todos los datos existentes antes de crear los de demostración. Para mantener los datos existentes, usar:
+```bash
+python manage.py crear_demo_data --no-limpiar
+```
+
 6. Ejecutar servidor de desarrollo:
 ```bash
 python manage.py runserver
@@ -65,7 +81,12 @@ Inspecciones_Zimvie/
 │   └── consultas/         # Consulta de estado
 ├── templates/             # Templates HTML
 ├── static/                # Archivos estáticos
-└── sql/                   # Schema SQL original
+├── sql/                   # Schema SQL original
+└── apps/
+    └── operarios/
+        └── management/
+            └── commands/
+                └── crear_demo_data.py  # Comando para crear datos de demostración
 ```
 
 ## Funcionalidades
@@ -129,9 +150,30 @@ Inspecciones_Zimvie/
    - Ver detalle de operario para ver todas sus certificaciones y periodos
    - Ver detalle de asignación para ver periodos e inspecciones
 
+## Comandos de Management
+
+### `crear_demo_data`
+
+Crea datos de demostración completos para el sistema, incluyendo:
+- Usuario administrador (admin/admin123)
+- Configuración del sistema (180 días, 29 inspecciones)
+- Operarios, certificaciones, auditores y auditorías de ejemplo
+- Asignaciones con diferentes estados (vigentes, críticas, completadas)
+- Periodos de validación con historial
+- Inspecciones distribuidas en diferentes escenarios
+
+**Uso**:
+```bash
+python manage.py crear_demo_data
+```
+
+**Opciones**:
+- `--no-limpiar`: Mantiene los datos existentes en lugar de eliminarlos antes de crear los de demostración
+
 ## Notas
 
 - Los días laborables excluyen sábados y domingos
 - No se pueden registrar inspecciones fuera del periodo vigente
 - Una vez completado un periodo (29 inspecciones), no se pueden agregar más inspecciones a ese periodo
 - Para reactivar una certificación caducada, se debe crear una nueva asignación
+- El sistema cuenta **piezas auditadas**, no número de inspecciones (una inspección puede incluir múltiples piezas)

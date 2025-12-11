@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -50,6 +51,46 @@ def editar_operario(request, pk):
 
 @login_required
 def detalle_operario(request, pk):
-    """Detalle de operario"""
+    """Detalle de operario con estadísticas de inspecciones"""
     operario = get_object_or_404(Operario, pk=pk)
-    return render(request, 'operarios/detalle.html', {'operario': operario})
+    
+    # Calcular todas las estadísticas
+    estadisticas = {
+        # Fase 1: Estadísticas principales
+        'total_inspecciones': operario.total_inspecciones(),
+        'total_piezas_auditadas': operario.total_piezas_auditadas(),
+        'promedio_piezas': operario.promedio_piezas_por_inspeccion(),
+        'primera_inspeccion': operario.primera_inspeccion(),
+        'ultima_inspeccion': operario.ultima_inspeccion(),
+        'dias_desde_ultima': operario.dias_desde_ultima_inspeccion(),
+        'inspecciones_ok': operario.inspecciones_ok(),
+        'inspecciones_no_ok': operario.inspecciones_no_ok(),
+        'inspecciones_sin_resultado': operario.inspecciones_sin_resultado(),
+        'tasa_exito': operario.tasa_exito(),
+        'tasa_no_conformidad': operario.tasa_no_conformidad(),
+        
+        # Fase 1: Estadísticas por certificación
+        'por_certificacion': operario.estadisticas_por_certificacion(),
+        
+        # Fase 2: Estadísticas por períodos
+        'ultimo_mes': operario.estadisticas_ultimo_mes(),
+        'ultimos_3_meses': operario.estadisticas_ultimos_3_meses(),
+        'ultimo_ano': operario.estadisticas_ultimo_ano(),
+        
+        # Fase 2: Estadísticas por auditor
+        'por_auditor': operario.estadisticas_por_auditor(),
+        
+        # Fase 2: Estadísticas por auditoría de producto
+        'por_auditoria': operario.estadisticas_por_auditoria_producto(),
+        
+        # Fase 2: Datos para gráfico
+        'grafico_evolucion': (lambda datos: json.dumps(datos, ensure_ascii=False) if datos and datos.get('labels') and len(datos.get('labels', [])) > 0 else None)(operario.datos_grafico_evolucion(12)),
+        
+        # Alertas
+        'ultima_no_ok': operario.ultima_inspeccion_no_ok(),
+    }
+    
+    return render(request, 'operarios/detalle.html', {
+        'operario': operario,
+        'estadisticas': estadisticas
+    })

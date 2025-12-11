@@ -2,16 +2,27 @@
 
 {% block title %}{{ operario.nombre_completo }} - Inspecciones Zimvie{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
 {% block content %}
+
 <div class="py-6">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-gray-900">{{ operario.nombre_completo }}</h1>
-            <a href="{% url 'operarios:editar' operario.pk %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                Editar
-            </a>
+            <div class="flex gap-2">
+                <a href="{% url 'consultas:detalle_operario' operario.pk %}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    Ver Detalle Completo
+                </a>
+                <a href="{% url 'operarios:editar' operario.pk %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    Editar
+                </a>
+            </div>
         </div>
 
+        <!-- Información básica del operario -->
         <div class="bg-white shadow rounded-lg p-6 mb-6">
             <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                 <div>
@@ -43,12 +54,489 @@
             </dl>
         </div>
 
-        <div class="bg-white shadow rounded-lg p-6">
-            <h2 class="text-xl font-bold text-gray-900 mb-4">Certificaciones</h2>
-            <a href="{% url 'consultas:detalle_operario' operario.pk %}" class="text-blue-600 hover:text-blue-800">
-                Ver detalle completo con certificaciones y periodos →
-            </a>
+        <!-- Alertas -->
+        {% if estadisticas.ultima_no_ok %}
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                        <strong>Última inspección NO OK:</strong> 
+                        {{ estadisticas.ultima_no_ok.fecha_inspeccion|date:"d/m/Y" }} - 
+                        {{ estadisticas.ultima_no_ok.auditor.nombre_completo }}
+                        {% if estadisticas.ultima_no_ok.observaciones %}
+                            <br><span class="text-xs mt-1 block">{{ estadisticas.ultima_no_ok.observaciones|truncatewords:20 }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
         </div>
+        {% endif %}
+
+        <!-- KPIs principales -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Inspecciones</dt>
+                            <dd class="text-2xl font-bold text-gray-900">{{ estadisticas.total_inspecciones }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
+                        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Tasa de Éxito</dt>
+                            <dd class="text-2xl font-bold text-gray-900">{{ estadisticas.tasa_exito }}%</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-purple-500 rounded-md p-3">
+                        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Piezas Auditadas</dt>
+                            <dd class="text-2xl font-bold text-gray-900">{{ estadisticas.total_piezas_auditadas }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 bg-orange-500 rounded-md p-3">
+                        <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Días desde Última</dt>
+                            <dd class="text-2xl font-bold text-gray-900">
+                                {% if estadisticas.dias_desde_ultima %}
+                                    {{ estadisticas.dias_desde_ultima }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estadísticas detalladas -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Resumen de resultados -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">Resumen de Resultados</h2>
+                <dl class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <dt class="text-sm font-medium text-gray-500">Inspecciones OK</dt>
+                        <dd class="text-lg font-semibold text-green-600">{{ estadisticas.inspecciones_ok }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-sm font-medium text-gray-500">Inspecciones NO OK</dt>
+                        <dd class="text-lg font-semibold text-red-600">{{ estadisticas.inspecciones_no_ok }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-sm font-medium text-gray-500">Sin Resultado</dt>
+                        <dd class="text-lg font-semibold text-gray-600">{{ estadisticas.inspecciones_sin_resultado }}</dd>
+                    </div>
+                    <div class="border-t pt-4">
+                        <div class="flex justify-between items-center">
+                            <dt class="text-sm font-medium text-gray-700">Promedio Piezas/Inspección</dt>
+                            <dd class="text-lg font-bold text-gray-900">{{ estadisticas.promedio_piezas }}</dd>
+                        </div>
+                    </div>
+                </dl>
+                <div class="mt-4 pt-4 border-t">
+                    <div class="text-sm text-gray-500">
+                        <p><strong>Primera inspección:</strong> {% if estadisticas.primera_inspeccion %}{{ estadisticas.primera_inspeccion|date:"d/m/Y" }}{% else %}N/A{% endif %}</p>
+                        <p><strong>Última inspección:</strong> {% if estadisticas.ultima_inspeccion %}{{ estadisticas.ultima_inspeccion|date:"d/m/Y" }}{% else %}N/A{% endif %}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas por período -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">Estadísticas por Período</h2>
+                <div class="space-y-4">
+                    <div class="border-b pb-3">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Último Mes</h3>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                                <span class="text-gray-500">Inspecciones:</span>
+                                <span class="font-semibold ml-1">{{ estadisticas.ultimo_mes.total }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Tasa éxito:</span>
+                                <span class="font-semibold ml-1">{{ estadisticas.ultimo_mes.tasa_exito }}%</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Piezas:</span>
+                                <span class="font-semibold ml-1">{{ estadisticas.ultimo_mes.piezas }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="border-b pb-3">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Últimos 3 Meses</h3>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                                <span class="text-gray-500">Inspecciones:</span>
+                                <span class="font-semibold ml-1">{{ estadisticas.ultimos_3_meses.total }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Tasa éxito:</span>
+                                <span class="font-semibold ml-1">{{ estadisticas.ultimos_3_meses.tasa_exito }}%</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Piezas:</span>
+                                <span class="font-semibold ml-1">{{ estadisticas.ultimos_3_meses.piezas }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Último Año</h3>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                                <span class="text-gray-500">Inspecciones:</span>
+                                <span class="font-semibold ml-1">{{ estadisticas.ultimo_ano.total }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Tasa éxito:</span>
+                                <span class="font-semibold ml-1">{{ estadisticas.ultimo_ano.tasa_exito }}%</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Piezas:</span>
+                                <span class="font-semibold ml-1">{{ estadisticas.ultimo_ano.piezas }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico de evolución -->
+        {% if estadisticas.grafico_evolucion %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Evolución Temporal (Últimos 12 Meses)</h2>
+            <div style="position: relative; height: 400px;">
+                <canvas id="graficoEvolucion"></canvas>
+            </div>
+            <div id="grafico-loading" class="text-center text-gray-500 py-8">Cargando gráfico...</div>
+            <script id="grafico-data" type="application/json">{{ estadisticas.grafico_evolucion|safe }}</script>
+        </div>
+        {% else %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Evolución Temporal (Últimos 12 Meses)</h2>
+            <p class="text-gray-500 text-center py-8">No hay datos suficientes para mostrar el gráfico de evolución.</p>
+        </div>
+        {% endif %}
+
+        <!-- Estadísticas por Certificación -->
+        {% if estadisticas.por_certificacion %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Estadísticas por Certificación</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Certificación</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inspecciones</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Piezas</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OK</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NO OK</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tasa Éxito</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for stat in estadisticas.por_certificacion %}
+                        <tr>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ stat.certificacion.nombre }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if stat.esta_activa %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Activa</span>
+                                {% else %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Caducada</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ stat.total_inspecciones }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ stat.total_piezas }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-green-600">{{ stat.ok }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-red-600">{{ stat.no_ok }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold {% if stat.tasa_exito >= 90 %}text-green-600{% elif stat.tasa_exito >= 70 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                {{ stat.tasa_exito }}%
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Estadísticas por Auditor -->
+        {% if estadisticas.por_auditor %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Estadísticas por Auditor</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auditor</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inspecciones</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Piezas</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OK</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NO OK</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tasa Éxito</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for stat in estadisticas.por_auditor %}
+                        <tr>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ stat.auditor_nombre }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ stat.total_inspecciones }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ stat.total_piezas }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-green-600">{{ stat.ok }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-red-600">{{ stat.no_ok }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold {% if stat.tasa_exito >= 90 %}text-green-600{% elif stat.tasa_exito >= 70 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                {{ stat.tasa_exito }}%
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Estadísticas por Auditoría de Producto -->
+        {% if estadisticas.por_auditoria %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Estadísticas por Auditoría de Producto</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Auditoría</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inspecciones</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Piezas</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OK</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NO OK</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tasa Éxito</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for stat in estadisticas.por_auditoria %}
+                        <tr>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ stat.auditoria_nombre }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ stat.total_inspecciones }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ stat.total_piezas }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-green-600">{{ stat.ok }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-red-600">{{ stat.no_ok }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold {% if stat.tasa_exito >= 90 %}text-green-600{% elif stat.tasa_exito >= 70 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                {{ stat.tasa_exito }}%
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
+
+{% if estadisticas.grafico_evolucion %}
+<script>
+    // Función para inicializar el gráfico
+    function inicializarGrafico() {
+        const ctx = document.getElementById('graficoEvolucion');
+        const graficoDataElement = document.getElementById('grafico-data');
+        const loadingElement = document.getElementById('grafico-loading');
+        
+        // Verificar que Chart.js esté disponible
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js no está cargado');
+            if (loadingElement) loadingElement.textContent = 'Error: Chart.js no está disponible';
+            return;
+        }
+        
+        if (!ctx || !graficoDataElement) {
+            console.error('No se encontraron los elementos necesarios');
+            return;
+        }
+        
+        try {
+            const graficoData = JSON.parse(graficoDataElement.textContent);
+            
+            // Ocultar mensaje de carga
+            if (loadingElement) loadingElement.style.display = 'none';
+            
+            // Verificar que hay datos
+            if (!graficoData.labels || graficoData.labels.length === 0) {
+                if (loadingElement) {
+                    loadingElement.style.display = 'block';
+                    loadingElement.textContent = 'No hay datos para mostrar en el gráfico';
+                }
+                return;
+            }
+            
+            new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: graficoData.labels,
+                            datasets: [{
+                                label: 'Tasa de Éxito (%)',
+                                data: graficoData.tasa_exito,
+                                borderColor: 'rgb(34, 197, 94)',
+                                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                tension: 0.3,
+                                yAxisID: 'y',
+                                fill: false
+                            }, {
+                                label: 'Inspecciones',
+                                data: graficoData.inspecciones,
+                                borderColor: 'rgb(59, 130, 246)',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                tension: 0.3,
+                                yAxisID: 'y1',
+                                fill: false
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false,
+                            },
+                            scales: {
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    title: {
+                                        display: true,
+                                        text: 'Tasa de Éxito (%)'
+                                    },
+                                    min: 0,
+                                    max: 100
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    title: {
+                                        display: true,
+                                        text: 'Número de Inspecciones'
+                                    },
+                                    grid: {
+                                        drawOnChartArea: false,
+                                    },
+                                    min: 0
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top',
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.datasetIndex === 0) {
+                                                label += context.parsed.y + '%';
+                                            } else {
+                                                label += context.parsed.y;
+                                            }
+                                            return label;
+                                        }
+                        }
+                    }
+                }
+            }
+        });
+        } catch (e) {
+            console.error('Error al crear el gráfico:', e);
+            if (loadingElement) {
+                loadingElement.style.display = 'block';
+                loadingElement.textContent = 'Error al cargar el gráfico: ' + e.message;
+            }
+        }
+    }
+    
+    // Esperar a que Chart.js esté cargado y el DOM esté listo
+    function esperarChartJS() {
+        if (typeof Chart !== 'undefined') {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', inicializarGrafico);
+            } else {
+                inicializarGrafico();
+            }
+        } else {
+            // Intentar cada 100ms hasta 5 segundos
+            let intentos = 0;
+            const maxIntentos = 50;
+            const intervalo = setInterval(function() {
+                intentos++;
+                if (typeof Chart !== 'undefined') {
+                    clearInterval(intervalo);
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', inicializarGrafico);
+                    } else {
+                        inicializarGrafico();
+                    }
+                } else if (intentos >= maxIntentos) {
+                    clearInterval(intervalo);
+                    console.error('Chart.js no se cargó después de 5 segundos');
+                    const loadingElement = document.getElementById('grafico-loading');
+                    if (loadingElement) {
+                        loadingElement.style.display = 'block';
+                        loadingElement.textContent = 'Error: No se pudo cargar Chart.js';
+                    }
+                }
+            }, 100);
+        }
+    }
+    
+    // Iniciar la espera
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', esperarChartJS);
+    } else {
+        esperarChartJS();
+    }
+</script>
+{% endif %}
 {% endblock %}

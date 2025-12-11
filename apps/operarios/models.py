@@ -134,17 +134,31 @@ class Operario(models.Model):
             fecha_inspeccion__gte=fecha_limite
         )
         
-        total = inspecciones.count()
-        piezas = inspecciones.aggregate(total=Sum('piezas_auditadas'))['total'] or 0
-        ok = inspecciones.filter(resultado_inspeccion='OK').count()
-        no_ok = inspecciones.filter(resultado_inspeccion='NO OK').count()
-        tasa_exito = round((ok / total * 100), 2) if total > 0 else 0
+        # Usar una sola agregación para obtener todos los valores de manera eficiente
+        agregacion = inspecciones.aggregate(
+            total=Count('id'),
+            total_piezas=Sum('piezas_auditadas'),
+            ok=Count('id', filter=Q(resultado_inspeccion='OK')),
+            no_ok=Count('id', filter=Q(resultado_inspeccion='NO OK'))
+        )
+        
+        total = agregacion['total'] or 0
+        piezas = agregacion['total_piezas'] or 0
+        ok = agregacion['ok'] or 0
+        no_ok = agregacion['no_ok'] or 0
+        
+        # Calcular tasa de éxito basada solo en inspecciones con resultado
+        # (excluyendo las que no tienen resultado aún)
+        inspecciones_con_resultado = ok + no_ok
+        tasa_exito = round((ok / inspecciones_con_resultado * 100), 2) if inspecciones_con_resultado > 0 else 0
+        sin_resultado = total - inspecciones_con_resultado
         
         return {
             'total': total,
             'piezas': piezas,
             'ok': ok,
             'no_ok': no_ok,
+            'sin_resultado': sin_resultado,
             'tasa_exito': tasa_exito
         }
 

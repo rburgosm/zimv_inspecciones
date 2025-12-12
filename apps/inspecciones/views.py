@@ -2,6 +2,7 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from .models import InspeccionProducto, PeriodoValidacionCertificacion
 from .forms import InspeccionProductoForm
@@ -67,12 +68,30 @@ def lista_inspecciones(request):
     operarios = list(operarios_qs)
     certificaciones = list(certificaciones_qs)
     
+    # Paginación
+    paginator = Paginator(inspecciones, 25)  # 25 inspecciones por página
+    page = request.GET.get('page', 1)
+    
+    try:
+        inspecciones_paginadas = paginator.page(page)
+    except PageNotAnInteger:
+        inspecciones_paginadas = paginator.page(1)
+    except EmptyPage:
+        inspecciones_paginadas = paginator.page(paginator.num_pages)
+    
+    # Construir query params para mantener filtros en la paginación
+    query_params = request.GET.copy()
+    if 'page' in query_params:
+        del query_params['page']
+    query_string = query_params.urlencode()
+    
     return render(request, 'inspecciones/lista.html', {
-        'inspecciones': inspecciones,
+        'inspecciones': inspecciones_paginadas,
         'operarios': operarios,
         'certificaciones': certificaciones,
         'operario_filtro': operario_filtro,
         'certificacion_filtro': certificacion_filtro,
+        'query_string': query_string,
         'certificaciones_json': json.dumps([
             {'id': c.id, 'nombre': c.nombre} for c in Certificacion.objects.filter(activa=True).order_by('nombre')
         ]),

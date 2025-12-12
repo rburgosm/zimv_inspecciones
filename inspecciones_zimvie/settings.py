@@ -132,8 +132,6 @@ STATICFILES_DIRS = [
 
 # CSRF settings (para ngrok y desarrollo)
 CSRF_TRUSTED_ORIGINS = [
-    'https://d72bf02fdeb3.ngrok-free.app',
-    'https://d033ece76789.ngrok-free.app',
     'https://0d04ba18bf1b.ngrok-free.app',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
